@@ -1,193 +1,209 @@
-import { useState } from 'react';
-import { defaultServices, ServiceConfig } from '@/lib/config';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
+import { useState, useEffect } from 'react';
+import { BookingConfig } from '@/lib/types';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Settings, ExternalLink, Copy, Check } from 'lucide-react';
+  loadBookings,
+  createBooking,
+  updateBooking,
+  deleteBooking,
+  toggleBookingStatus,
+} from '@/lib/bookingStore';
+import { BookingFormModal } from '@/components/admin/BookingFormModal';
+import { BookingsList } from '@/components/admin/BookingsList';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, Calendar, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 export default function AdminPage() {
   const navigate = useNavigate();
-  const [services, setServices] = useState<ServiceConfig[]>(defaultServices);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [bookings, setBookings] = useState<BookingConfig[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingBooking, setEditingBooking] = useState<BookingConfig | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  const toggleService = (serviceId: string) => {
-    setServices((prev) =>
-      prev.map((s) =>
-        s.service_id === serviceId ? { ...s, active: !s.active } : s
-      )
-    );
+  // Load bookings on mount
+  useEffect(() => {
+    setBookings(loadBookings());
+  }, []);
+
+  const handleCreateNew = () => {
+    setEditingBooking(null);
+    setIsModalOpen(true);
   };
 
-  const updateDuration = (serviceId: string, duration: number) => {
-    setServices((prev) =>
-      prev.map((s) =>
-        s.service_id === serviceId ? { ...s, duration } : s
-      )
-    );
+  const handleEdit = (booking: BookingConfig) => {
+    setEditingBooking(booking);
+    setIsModalOpen(true);
   };
 
-  const copyLink = (serviceId: string) => {
-    const url = `${window.location.origin}/agenda/${serviceId}`;
-    navigator.clipboard.writeText(url);
-    setCopiedId(serviceId);
-    setTimeout(() => setCopiedId(null), 2000);
+  const handleSave = (booking: BookingConfig) => {
+    if (editingBooking) {
+      // Update existing
+      updateBooking(booking.booking_id, booking);
+      toast.success('Booking actualizado correctamente');
+    } else {
+      // Create new
+      createBooking(booking);
+      toast.success('Booking creado correctamente');
+    }
+    setBookings(loadBookings());
   };
 
-  const openLink = (serviceId: string) => {
-    navigate(`/agenda/${serviceId}`);
+  const handleDelete = (bookingId: string) => {
+    setDeleteConfirmId(bookingId);
   };
+
+  const confirmDelete = () => {
+    if (deleteConfirmId) {
+      deleteBooking(deleteConfirmId);
+      setBookings(loadBookings());
+      toast.success('Booking eliminado');
+      setDeleteConfirmId(null);
+    }
+  };
+
+  const handleToggleStatus = (bookingId: string) => {
+    toggleBookingStatus(bookingId);
+    setBookings(loadBookings());
+  };
+
+  const activeCount = bookings.filter((b) => b.active).length;
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-              <Settings className="w-5 h-5 text-primary" />
+      <header className="border-b border-border bg-card sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/')}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-primary-foreground" />
+                </div>
+                <div>
+                  <h1 className="font-semibold text-foreground">Panel de Administración</h1>
+                  <p className="text-sm text-muted-foreground">
+                    {bookings.length} bookings • {activeCount} activos
+                  </p>
+                </div>
+              </div>
             </div>
-            <div>
-              <h1 className="font-semibold text-foreground">Panel de Configuración</h1>
-              <p className="text-sm text-muted-foreground">Efficommerce Scheduling</p>
-            </div>
+            <Button onClick={handleCreateNew} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Nuevo Booking
+            </Button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* Services Table */}
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <div className="p-6 border-b border-border">
-            <h2 className="text-lg font-semibold text-foreground">Servicios de Agenda</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Configura los links de agendamiento para cada servicio
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="bg-card rounded-xl border border-border p-4">
+            <p className="text-sm text-muted-foreground">Total Bookings</p>
+            <p className="text-2xl font-bold text-foreground">{bookings.length}</p>
+          </div>
+          <div className="bg-card rounded-xl border border-border p-4">
+            <p className="text-sm text-muted-foreground">Activos</p>
+            <p className="text-2xl font-bold text-success">{activeCount}</p>
+          </div>
+          <div className="bg-card rounded-xl border border-border p-4">
+            <p className="text-sm text-muted-foreground">Pausados</p>
+            <p className="text-2xl font-bold text-muted-foreground">
+              {bookings.length - activeCount}
             </p>
           </div>
-
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Servicio</TableHead>
-                <TableHead>Área</TableHead>
-                <TableHead>País</TableHead>
-                <TableHead>Duración</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {services.map((service) => (
-                <TableRow key={service.service_id}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium text-foreground">{service.name}</p>
-                      <p className="text-sm text-muted-foreground">{service.service_id}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{service.area}</Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {service.country}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        value={service.duration}
-                        onChange={(e) =>
-                          updateDuration(service.service_id, parseInt(e.target.value) || 30)
-                        }
-                        className="w-20 h-8"
-                        min={15}
-                        max={120}
-                        step={15}
-                      />
-                      <span className="text-sm text-muted-foreground">min</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={service.active}
-                        onCheckedChange={() => toggleService(service.service_id)}
-                      />
-                      <span className={service.active ? 'text-success' : 'text-muted-foreground'}>
-                        {service.active ? 'Activo' : 'Pausado'}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => copyLink(service.service_id)}
-                        className="h-8 w-8"
-                      >
-                        {copiedId === service.service_id ? (
-                          <Check className="w-4 h-4 text-success" />
-                        ) : (
-                          <Copy className="w-4 h-4" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openLink(service.service_id)}
-                        className="h-8 w-8"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
         </div>
 
-        {/* Info Section */}
+        {/* Section Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Links de Booking</h2>
+            <p className="text-sm text-muted-foreground">
+              Cada booking genera una mini-landing en /booking/[id]
+            </p>
+          </div>
+        </div>
+
+        {/* Bookings List */}
+        <BookingsList
+          bookings={bookings}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onToggleStatus={handleToggleStatus}
+        />
+
+        {/* Info Cards */}
         <div className="mt-8 grid gap-6 md:grid-cols-2">
           <div className="bg-card rounded-xl border border-border p-6">
-            <h3 className="font-semibold text-foreground mb-2">URLs de Webhook</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Configura estas variables de entorno para conectar con n8n:
-            </p>
-            <div className="space-y-2 font-mono text-sm">
-              <p className="text-muted-foreground">
-                VITE_N8N_GET_AVAILABILITY_URL
-              </p>
-              <p className="text-muted-foreground">
-                VITE_N8N_CREATE_BOOKING_URL
-              </p>
-            </div>
+            <h3 className="font-semibold text-foreground mb-2">Cómo funciona</h3>
+            <ul className="text-sm text-muted-foreground space-y-2">
+              <li>• Cada booking tiene sus propias URLs de n8n</li>
+              <li>• El frontend solo renderiza, no tiene lógica de negocio</li>
+              <li>• Los horarios vienen de n8n (o modo demo si no está configurado)</li>
+              <li>• Puedes pausar/activar bookings sin eliminarlos</li>
+            </ul>
           </div>
 
           <div className="bg-card rounded-xl border border-border p-6">
             <h3 className="font-semibold text-foreground mb-2">Estructura de URLs</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Los links de agenda siguen este formato:
-            </p>
-            <div className="space-y-1 font-mono text-sm text-primary">
-              <p>/agenda/ventas-colombia</p>
-              <p>/agenda/onboarding-mexico</p>
-              <p>/agenda/soporte-latam</p>
+            <div className="space-y-2 font-mono text-sm">
+              <p className="text-primary">/booking/ventas-colombia</p>
+              <p className="text-primary">/booking/onboarding-latam</p>
+              <p className="text-primary">/booking/soporte-mx</p>
             </div>
+            <p className="text-xs text-muted-foreground mt-3">
+              El ID del booking define la URL automáticamente
+            </p>
           </div>
         </div>
       </main>
+
+      {/* Create/Edit Modal */}
+      <BookingFormModal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSave}
+        booking={editingBooking}
+        mode={editingBooking ? 'edit' : 'create'}
+      />
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este booking?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. El link dejará de funcionar inmediatamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

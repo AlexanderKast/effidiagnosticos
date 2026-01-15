@@ -19,7 +19,10 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/agenda/:serviceId" element={<BookingPage />} />
+          {/* Dynamic booking pages - each booking_id renders its own landing */}
+          <Route path="/booking/:bookingId" element={<BookingPage />} />
+          {/* Legacy route support */}
+          <Route path="/agenda/:bookingId" element={<BookingPage />} />
           <Route path="/confirmacion" element={<ConfirmationPage />} />
           <Route path="/admin" element={<AdminPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
