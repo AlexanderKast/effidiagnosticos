@@ -69,12 +69,15 @@ export default function BookingPage() {
   }, [bookingId]);
 
   // Fetch availability when date is selected
+  // States reset: selectedSlot = null, availableSlots = [], isLoadingSlots = true
   useEffect(() => {
     if (!selectedDate || !booking) return;
 
     const fetchAvailability = async () => {
-      setIsLoadingSlots(true);
+      // Reset state before fetching
+      setSelectedTime(null);
       setAvailableSlots([]);
+      setIsLoadingSlots(true);
 
       try {
         if (booking.n8n_get_availability_url) {
@@ -89,14 +92,19 @@ export default function BookingPage() {
 
           if (response.ok) {
             const data = await response.json();
-            setAvailableSlots(data.available_slots || []);
+            // Support both "slots" and "available_slots" from n8n response
+            const slots = data.slots || data.available_slots || [];
+            setAvailableSlots(slots);
+            setIsLoadingSlots(false);
             return;
           }
         }
-        // Demo fallback
+        // Demo fallback if no URL configured
+        console.log('No n8n URL configured, using demo slots');
         setAvailableSlots(['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
       } catch (error) {
-        console.log('Using demo slots');
+        console.error('Error fetching availability:', error);
+        // Demo fallback on error
         setAvailableSlots(['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
       } finally {
         setIsLoadingSlots(false);
