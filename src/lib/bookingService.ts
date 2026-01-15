@@ -74,18 +74,16 @@ export const fetchActiveBookings = async (): Promise<BookingConfig[]> => {
   return (data || []).map(dbToBookingConfig);
 };
 
-// Fetch a single booking by ID
+// Fetch a single booking by ID (public - only active bookings)
 export const fetchBookingById = async (bookingId: string): Promise<BookingConfig | null> => {
   const { data, error } = await supabase
     .from('booking_configs')
     .select('*')
     .eq('booking_id', bookingId)
-    .single();
+    .eq('active', true)
+    .maybeSingle();
 
   if (error) {
-    if (error.code === 'PGRST116') {
-      return null; // Not found
-    }
     console.error('Error fetching booking:', error);
     throw error;
   }
