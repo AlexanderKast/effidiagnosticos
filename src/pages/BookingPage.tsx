@@ -215,49 +215,89 @@ export default function BookingPage() {
     setIsSubmitting(true);
 
     try {
-      if (booking.n8n_create_booking_url) {
-        // Transform formData to use visible labels instead of internal IDs
-        const formDataWithLabels: Record<string, string> = {};
-        booking.formFields.forEach(field => {
-          if (formData[field.id] !== undefined) {
-            let displayValue = formData[field.id];
-            
-            // For select, radio, multiselect - convert values to visible labels
-            if ((field.type === 'select' || field.type === 'radio') && field.options) {
-              const option = field.options.find(opt => opt.value === displayValue);
-              if (option) {
-                displayValue = option.label;
-              }
-            } else if (field.type === 'multiselect' && field.options) {
-              const selectedValues = displayValue.split(',').filter(v => v);
-              const selectedLabels = selectedValues.map(val => {
-                const option = field.options?.find(opt => opt.value === val);
-                return option ? option.label : val;
-              });
-              displayValue = selectedLabels.join(', ');
-            } else if (field.type === 'checkbox') {
-              displayValue = displayValue === 'true' ? 'Sí' : 'No';
+      // Transform formData to use visible labels instead of internal IDs
+      const formDataWithLabels: Record<string, string> = {};
+      booking.formFields.forEach(field => {
+        if (formData[field.id] !== undefined) {
+          let displayValue = formData[field.id];
+          
+          // For select, radio, multiselect - convert values to visible labels
+          if ((field.type === 'select' || field.type === 'radio') && field.options) {
+            const option = field.options.find(opt => opt.value === displayValue);
+            if (option) {
+              displayValue = option.label;
             }
-            
-            formDataWithLabels[field.label] = displayValue;
+          } else if (field.type === 'multiselect' && field.options) {
+            const selectedValues = displayValue.split(',').filter(v => v);
+            const selectedLabels = selectedValues.map(val => {
+              const option = field.options?.find(opt => opt.value === val);
+              return option ? option.label : val;
+            });
+            displayValue = selectedLabels.join(', ');
+          } else if (field.type === 'checkbox') {
+            displayValue = displayValue === 'true' ? 'Sí' : 'No';
           }
-        });
+          
+          formDataWithLabels[field.label] = displayValue;
+        }
+      });
 
-        await fetch(booking.n8n_create_booking_url, {
+      if (booking.n8n_create_booking_url) {
+        const response = await fetch(booking.n8n_create_booking_url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             booking_id: booking.booking_id,
-            ...formDataWithLabels, // Send form data with visible labels
+            ...formDataWithLabels,
             date: format(selectedDate, 'yyyy-MM-dd'),
             time: selectedTime,
           }),
         });
+        
+        let webhookData = null;
+        try {
+          webhookData = await response.json();
+        } catch {
+          // Response might not be JSON
+        }
+        
+        navigate('/confirmacion', { 
+          state: { 
+            webhookResponse: webhookData,
+            bookingDetails: {
+              date: format(selectedDate, 'dd/MM/yyyy'),
+              time: selectedTime,
+              duration: booking.duration,
+              bookingName: booking.name,
+              ...formDataWithLabels
+            }
+          } 
+        });
+      } else {
+        navigate('/confirmacion', { 
+          state: { 
+            bookingDetails: {
+              date: format(selectedDate, 'dd/MM/yyyy'),
+              time: selectedTime,
+              duration: booking.duration,
+              bookingName: booking.name,
+              ...formDataWithLabels
+            }
+          } 
+        });
       }
-      navigate('/confirmacion');
     } catch (error) {
       console.log('Demo mode: navigating to confirmation');
-      navigate('/confirmacion');
+      navigate('/confirmacion', { 
+        state: { 
+          bookingDetails: {
+            date: format(selectedDate, 'dd/MM/yyyy'),
+            time: selectedTime,
+            duration: booking?.duration,
+            bookingName: booking?.name,
+          }
+        } 
+      });
     } finally {
       setIsSubmitting(false);
     }
