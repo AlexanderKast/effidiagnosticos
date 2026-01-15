@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BookingConfig, BookingBulletPoint, createDefaultBooking } from '@/lib/types';
+import { BookingConfig, BookingBulletPoint, FormField, createDefaultBooking } from '@/lib/types';
 import { checkBookingIdUnique } from '@/lib/bookingService';
 import { generateSlug } from '@/lib/bookingStore';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 import { Plus, Trash2 } from 'lucide-react';
+import { FormFieldsEditor } from './FormFieldsEditor';
 
 interface BookingFormModalProps {
   open: boolean;
@@ -184,10 +185,11 @@ export function BookingFormModal({
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-          <TabsList className="grid grid-cols-4 w-full">
+          <TabsList className="grid grid-cols-5 w-full">
             <TabsTrigger value="identity">Identidad</TabsTrigger>
             <TabsTrigger value="content">Contenido</TabsTrigger>
             <TabsTrigger value="audience">Audiencia</TabsTrigger>
+            <TabsTrigger value="form">Formulario</TabsTrigger>
             <TabsTrigger value="config">Configuración</TabsTrigger>
           </TabsList>
 
@@ -289,6 +291,13 @@ export function BookingFormModal({
             <BulletPointEditor field="targetAudience" label="¿Para quién es esta reunión?" />
             <BulletPointEditor field="notFor" label="¿Para quién NO es?" />
             <BulletPointEditor field="expectations" label="¿Qué esperamos del usuario?" />
+          </TabsContent>
+          {/* Form Fields Tab */}
+          <TabsContent value="form" className="mt-4">
+            <FormFieldsEditor
+              fields={formData.formFields}
+              onChange={(fields: FormField[]) => updateField('formFields', fields)}
+            />
           </TabsContent>
 
           {/* Config Tab */}
