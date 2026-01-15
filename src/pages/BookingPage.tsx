@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { BookingConfig, BookingFormData } from '@/lib/types';
+import { BookingConfig, FormField } from '@/lib/types';
 import { fetchBookingById } from '@/lib/bookingService';
 import { StepIndicator } from '@/components/booking/StepIndicator';
 import { DatePickerStep } from '@/components/booking/DatePickerStep';
@@ -12,6 +12,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   ArrowLeft,
   Clock,
@@ -48,7 +55,32 @@ export default function BookingPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [acceptedPolicy, setAcceptedPolicy] = useState(false);
 
-  // Load booking config from database
+  // Check if a field should be visible based on its condition
+  const isFieldVisible = useCallback((field: FormField): boolean => {
+    if (!field.condition) return true;
+    
+    const { fieldId, operator, value } = field.condition;
+    const fieldValue = formData[fieldId] || '';
+
+    switch (operator) {
+      case 'equals':
+        return fieldValue === value;
+      case 'not_equals':
+        return fieldValue !== value;
+      case 'contains':
+        return fieldValue.toLowerCase().includes((value || '').toLowerCase());
+      case 'not_empty':
+        return fieldValue.trim() !== '';
+      default:
+        return true;
+    }
+  }, [formData]);
+
+  // Get visible fields
+  const getVisibleFields = useCallback(() => {
+    if (!booking) return [];
+    return booking.formFields.filter(isFieldVisible);
+  }, [booking, isFieldVisible]);
   useEffect(() => {
     const loadBooking = async () => {
       if (!bookingId) {
@@ -140,8 +172,9 @@ export default function BookingPage() {
     if (!booking) return false;
     const errors: Record<string, string> = {};
 
-    // Validate each required field dynamically
-    booking.formFields.forEach(field => {
+    // Validate each required field dynamically (only visible fields)
+    const visibleFields = getVisibleFields();
+    visibleFields.forEach(field => {
       if (field.required) {
         const value = formData[field.id]?.trim() || '';
         if (!value) {
@@ -399,11 +432,12 @@ export default function BookingPage() {
 
                   <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-4">
                     {/* Dynamic Form Fields */}
-                    {booking.formFields.map((field) => (
-                      <div key={field.id} className="space-y-2">
+                    {getVisibleFields().map((field) => (
+                      <div key={field.id} className="space-y-2 animate-fade-in">
                         <Label htmlFor={field.id}>
                           {field.label} {field.required ? '*' : '(opcional)'}
                         </Label>
+                        
                         {field.type === 'textarea' ? (
                           <Textarea
                             id={field.id}
@@ -413,6 +447,25 @@ export default function BookingPage() {
                             className={formErrors[field.id] ? 'border-destructive' : ''}
                             rows={3}
                           />
+                        ) : field.type === 'select' ? (
+                          <Select
+                            value={formData[field.id] || ''}
+                            onValueChange={(value) => setFormData({ ...formData, [field.id]: value })}
+                          >
+                            <SelectTrigger 
+                              id={field.id}
+                              className={formErrors[field.id] ? 'border-destructive' : ''}
+                            >
+                              <SelectValue placeholder={field.placeholder || 'Selecciona una opción'} />
+                            </SelectTrigger>
+                            <SelectContent className="bg-popover z-50">
+                              {(field.options || []).map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         ) : (
                           <Input
                             id={field.id}
@@ -423,6 +476,7 @@ export default function BookingPage() {
                             className={formErrors[field.id] ? 'border-destructive' : ''}
                           />
                         )}
+                        
                         {formErrors[field.id] && (
                           <p className="text-sm text-destructive">{formErrors[field.id]}</p>
                         )}
