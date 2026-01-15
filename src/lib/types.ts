@@ -13,13 +13,21 @@ export interface FormFieldOption {
   label: string;
 }
 
+// Conditional logic for showing/hiding fields
+export interface FieldCondition {
+  fieldId: string;      // Which field to check
+  operator: 'equals' | 'not_equals' | 'contains' | 'not_empty';
+  value?: string;       // Value to compare (not needed for not_empty)
+}
+
 export interface FormField {
   id: string;
   label: string;
   type: FormFieldType;
   required: boolean;
   placeholder?: string;
-  options?: FormFieldOption[]; // For select fields
+  options?: FormFieldOption[];     // For select fields
+  condition?: FieldCondition;      // Show field only if condition is met
 }
 
 export interface BookingConfig {
