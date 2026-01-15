@@ -216,12 +216,20 @@ export default function BookingPage() {
 
     try {
       if (booking.n8n_create_booking_url) {
+        // Transform formData to use visible labels instead of internal IDs
+        const formDataWithLabels: Record<string, string> = {};
+        booking.formFields.forEach(field => {
+          if (formData[field.id] !== undefined) {
+            formDataWithLabels[field.label] = formData[field.id];
+          }
+        });
+
         await fetch(booking.n8n_create_booking_url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             booking_id: booking.booking_id,
-            ...formData, // Send all dynamic form data
+            ...formDataWithLabels, // Send form data with visible labels
             date: format(selectedDate, 'yyyy-MM-dd'),
             time: selectedTime,
           }),
