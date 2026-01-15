@@ -6,7 +6,19 @@ export interface BookingBulletPoint {
 }
 
 // Form field types
-export type FormFieldType = 'text' | 'email' | 'textarea' | 'tel' | 'select';
+export type FormFieldType = 
+  | 'text' 
+  | 'email' 
+  | 'textarea' 
+  | 'tel' 
+  | 'select'
+  | 'multiselect'    // Multiple selection checkboxes
+  | 'radio'          // Radio buttons (single selection)
+  | 'checkbox'       // Single checkbox (yes/no)
+  | 'number'         // Numeric input
+  | 'date'           // Date picker
+  | 'url'            // URL input
+  | 'hidden';        // Hidden field with default value
 
 export interface FormFieldOption {
   value: string;
@@ -26,8 +38,12 @@ export interface FormField {
   type: FormFieldType;
   required: boolean;
   placeholder?: string;
-  options?: FormFieldOption[];     // For select fields
+  options?: FormFieldOption[];     // For select, multiselect, radio fields
   condition?: FieldCondition;      // Show field only if condition is met
+  defaultValue?: string;           // Default value (useful for hidden fields)
+  min?: number;                    // For number fields
+  max?: number;                    // For number fields
+  helpText?: string;               // Help text shown below the field
 }
 
 export interface BookingConfig {

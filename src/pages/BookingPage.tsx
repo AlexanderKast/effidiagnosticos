@@ -175,12 +175,28 @@ export default function BookingPage() {
     // Validate each required field dynamically (only visible fields)
     const visibleFields = getVisibleFields();
     visibleFields.forEach(field => {
+      // Skip hidden fields
+      if (field.type === 'hidden') return;
+      
       if (field.required) {
         const value = formData[field.id]?.trim() || '';
         if (!value) {
           errors[field.id] = `${field.label} es requerido`;
         } else if (field.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
           errors[field.id] = 'Email inválido';
+        } else if (field.type === 'url' && !/^https?:\/\/.+/.test(value)) {
+          errors[field.id] = 'URL inválida (debe comenzar con http:// o https://)';
+        } else if (field.type === 'number') {
+          const numValue = parseFloat(value);
+          if (isNaN(numValue)) {
+            errors[field.id] = 'Debe ser un número válido';
+          } else if (field.min !== undefined && numValue < field.min) {
+            errors[field.id] = `El valor mínimo es ${field.min}`;
+          } else if (field.max !== undefined && numValue > field.max) {
+            errors[field.id] = `El valor máximo es ${field.max}`;
+          }
+        } else if (field.type === 'checkbox' && value !== 'true') {
+          errors[field.id] = `Debes aceptar ${field.label}`;
         }
       }
     });
@@ -432,56 +448,193 @@ export default function BookingPage() {
 
                   <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-4">
                     {/* Dynamic Form Fields */}
-                    {getVisibleFields().map((field) => (
-                      <div key={field.id} className="space-y-2 animate-fade-in">
-                        <Label htmlFor={field.id}>
-                          {field.label} {field.required ? '*' : '(opcional)'}
-                        </Label>
-                        
-                        {field.type === 'textarea' ? (
-                          <Textarea
-                            id={field.id}
-                            value={formData[field.id] || ''}
-                            onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })}
-                            placeholder={field.placeholder}
-                            className={formErrors[field.id] ? 'border-destructive' : ''}
-                            rows={3}
+                    {getVisibleFields().map((field) => {
+                      // Hidden fields
+                      if (field.type === 'hidden') {
+                        return (
+                          <input
+                            key={field.id}
+                            type="hidden"
+                            name={field.id}
+                            value={field.defaultValue || ''}
                           />
-                        ) : field.type === 'select' ? (
-                          <Select
-                            value={formData[field.id] || ''}
-                            onValueChange={(value) => setFormData({ ...formData, [field.id]: value })}
-                          >
-                            <SelectTrigger 
+                        );
+                      }
+
+                      return (
+                        <div key={field.id} className="space-y-2 animate-fade-in">
+                          {/* Label - not for checkbox type */}
+                          {field.type !== 'checkbox' && (
+                            <Label htmlFor={field.id}>
+                              {field.label} {field.required ? '*' : '(opcional)'}
+                            </Label>
+                          )}
+                          
+                          {/* Textarea */}
+                          {field.type === 'textarea' && (
+                            <Textarea
                               id={field.id}
+                              value={formData[field.id] || ''}
+                              onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })}
+                              placeholder={field.placeholder}
                               className={formErrors[field.id] ? 'border-destructive' : ''}
+                              rows={3}
+                            />
+                          )}
+                          
+                          {/* Select dropdown */}
+                          {field.type === 'select' && (
+                            <Select
+                              value={formData[field.id] || ''}
+                              onValueChange={(value) => setFormData({ ...formData, [field.id]: value })}
                             >
-                              <SelectValue placeholder={field.placeholder || 'Selecciona una opción'} />
-                            </SelectTrigger>
-                            <SelectContent className="bg-popover z-50">
+                              <SelectTrigger 
+                                id={field.id}
+                                className={formErrors[field.id] ? 'border-destructive' : ''}
+                              >
+                                <SelectValue placeholder={field.placeholder || 'Selecciona una opción'} />
+                              </SelectTrigger>
+                              <SelectContent className="bg-popover z-50">
+                                {(field.options || []).map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+
+                          {/* Radio buttons */}
+                          {field.type === 'radio' && (
+                            <div className={`space-y-2 ${formErrors[field.id] ? 'text-destructive' : ''}`}>
                               {(field.options || []).map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
+                                <label
+                                  key={option.value}
+                                  className="flex items-center gap-3 p-3 border border-border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                                >
+                                  <input
+                                    type="radio"
+                                    name={field.id}
+                                    value={option.value}
+                                    checked={formData[field.id] === option.value}
+                                    onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })}
+                                    className="w-4 h-4 text-primary"
+                                  />
+                                  <span>{option.label}</span>
+                                </label>
                               ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Input
-                            id={field.id}
-                            type={field.type === 'email' ? 'email' : field.type === 'tel' ? 'tel' : 'text'}
-                            value={formData[field.id] || ''}
-                            onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })}
-                            placeholder={field.placeholder}
-                            className={formErrors[field.id] ? 'border-destructive' : ''}
-                          />
-                        )}
-                        
-                        {formErrors[field.id] && (
-                          <p className="text-sm text-destructive">{formErrors[field.id]}</p>
-                        )}
-                      </div>
-                    ))}
+                            </div>
+                          )}
+
+                          {/* Multiselect checkboxes */}
+                          {field.type === 'multiselect' && (
+                            <div className={`space-y-2 ${formErrors[field.id] ? 'text-destructive' : ''}`}>
+                              {(field.options || []).map((option) => {
+                                const selectedValues = formData[field.id] ? formData[field.id].split(',') : [];
+                                const isChecked = selectedValues.includes(option.value);
+                                return (
+                                  <label
+                                    key={option.value}
+                                    className="flex items-center gap-3 p-3 border border-border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                                  >
+                                    <Checkbox
+                                      checked={isChecked}
+                                      onCheckedChange={(checked) => {
+                                        let newValues = [...selectedValues];
+                                        if (checked) {
+                                          newValues.push(option.value);
+                                        } else {
+                                          newValues = newValues.filter(v => v !== option.value);
+                                        }
+                                        setFormData({ ...formData, [field.id]: newValues.filter(Boolean).join(',') });
+                                      }}
+                                    />
+                                    <span>{option.label}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* Single checkbox */}
+                          {field.type === 'checkbox' && (
+                            <div className="flex items-start gap-3 p-3 border border-border rounded-lg">
+                              <Checkbox
+                                id={field.id}
+                                checked={formData[field.id] === 'true'}
+                                onCheckedChange={(checked) => 
+                                  setFormData({ ...formData, [field.id]: checked ? 'true' : '' })
+                                }
+                                className={formErrors[field.id] ? 'border-destructive' : ''}
+                              />
+                              <Label htmlFor={field.id} className="text-sm leading-relaxed cursor-pointer">
+                                {field.placeholder || field.label}
+                                {field.required && ' *'}
+                              </Label>
+                            </div>
+                          )}
+
+                          {/* Number input */}
+                          {field.type === 'number' && (
+                            <Input
+                              id={field.id}
+                              type="number"
+                              value={formData[field.id] || ''}
+                              onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })}
+                              placeholder={field.placeholder}
+                              min={field.min}
+                              max={field.max}
+                              className={formErrors[field.id] ? 'border-destructive' : ''}
+                            />
+                          )}
+
+                          {/* Date input */}
+                          {field.type === 'date' && (
+                            <Input
+                              id={field.id}
+                              type="date"
+                              value={formData[field.id] || ''}
+                              onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })}
+                              className={formErrors[field.id] ? 'border-destructive' : ''}
+                            />
+                          )}
+
+                          {/* URL input */}
+                          {field.type === 'url' && (
+                            <Input
+                              id={field.id}
+                              type="url"
+                              value={formData[field.id] || ''}
+                              onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })}
+                              placeholder={field.placeholder || 'https://...'}
+                              className={formErrors[field.id] ? 'border-destructive' : ''}
+                            />
+                          )}
+
+                          {/* Text, Email, Tel inputs */}
+                          {['text', 'email', 'tel'].includes(field.type) && (
+                            <Input
+                              id={field.id}
+                              type={field.type}
+                              value={formData[field.id] || ''}
+                              onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })}
+                              placeholder={field.placeholder}
+                              className={formErrors[field.id] ? 'border-destructive' : ''}
+                            />
+                          )}
+
+                          {/* Help text */}
+                          {field.helpText && (
+                            <p className="text-xs text-muted-foreground">{field.helpText}</p>
+                          )}
+                          
+                          {/* Error message */}
+                          {formErrors[field.id] && (
+                            <p className="text-sm text-destructive">{formErrors[field.id]}</p>
+                          )}
+                        </div>
+                      );
+                    })}
 
                     {/* Policy Checkbox */}
                     {booking.requirePolicyAcceptance && (
