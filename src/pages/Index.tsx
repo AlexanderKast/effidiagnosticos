@@ -1,10 +1,18 @@
 import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { defaultServices } from '@/lib/config';
+import { loadBookings } from '@/lib/bookingStore';
+import { BookingConfig } from '@/lib/types';
 import { Calendar, Clock, MapPin, ArrowRight, Settings } from 'lucide-react';
 
 export default function Index() {
   const navigate = useNavigate();
+  const [bookings, setBookings] = useState<BookingConfig[]>([]);
+
+  useEffect(() => {
+    const loaded = loadBookings();
+    setBookings(loaded.filter((b) => b.active));
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -55,37 +63,51 @@ export default function Index() {
             Servicios disponibles
           </h2>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {defaultServices.filter(s => s.active).map((service) => (
-              <button
-                key={service.service_id}
-                onClick={() => navigate(`/agenda/${service.service_id}`)}
-                className="group bg-card rounded-xl border border-border p-6 text-left transition-all duration-200 hover:border-primary hover:shadow-large"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                    <Calendar className="w-6 h-6 text-primary" />
+          {bookings.length === 0 ? (
+            <div className="text-center py-12 bg-muted/30 rounded-xl border border-dashed border-border">
+              <p className="text-muted-foreground mb-2">No hay servicios disponibles</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Crea tu primer booking desde el panel de administración
+              </p>
+              <Button onClick={() => navigate('/admin')}>
+                Ir al Admin
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {bookings.map((booking) => (
+                <button
+                  key={booking.booking_id}
+                  onClick={() => navigate(`/booking/${booking.booking_id}`)}
+                  className="group bg-card rounded-xl border border-border p-6 text-left transition-all duration-200 hover:border-primary hover:shadow-large"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                      <Calendar className="w-6 h-6 text-primary" />
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
                   </div>
-                  <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
-                </div>
 
-                <h3 className="font-semibold text-foreground mb-2">
-                  {service.name}
-                </h3>
+                  <h3 className="font-semibold text-foreground mb-2">
+                    {booking.name}
+                  </h3>
 
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="w-4 h-4" />
-                    <span>{service.duration} min</span>
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-4 h-4" />
+                      <span>{booking.duration} min</span>
+                    </div>
+                    {booking.country && (
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4" />
+                        <span>{booking.country}</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <MapPin className="w-4 h-4" />
-                    <span>{service.country}</span>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
