@@ -220,7 +220,26 @@ export default function BookingPage() {
         const formDataWithLabels: Record<string, string> = {};
         booking.formFields.forEach(field => {
           if (formData[field.id] !== undefined) {
-            formDataWithLabels[field.label] = formData[field.id];
+            let displayValue = formData[field.id];
+            
+            // For select, radio, multiselect - convert values to visible labels
+            if ((field.type === 'select' || field.type === 'radio') && field.options) {
+              const option = field.options.find(opt => opt.value === displayValue);
+              if (option) {
+                displayValue = option.label;
+              }
+            } else if (field.type === 'multiselect' && field.options) {
+              const selectedValues = displayValue.split(',').filter(v => v);
+              const selectedLabels = selectedValues.map(val => {
+                const option = field.options?.find(opt => opt.value === val);
+                return option ? option.label : val;
+              });
+              displayValue = selectedLabels.join(', ');
+            } else if (field.type === 'checkbox') {
+              displayValue = displayValue === 'true' ? 'Sí' : 'No';
+            }
+            
+            formDataWithLabels[field.label] = displayValue;
           }
         });
 
