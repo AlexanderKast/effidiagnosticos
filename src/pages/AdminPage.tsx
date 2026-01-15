@@ -11,6 +11,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { BookingFormModal } from '@/components/admin/BookingFormModal';
 import { BookingsList } from '@/components/admin/BookingsList';
+import { TeamManagement } from '@/components/admin/TeamManagement';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -225,6 +226,11 @@ export default function AdminPage() {
             onToggleStatus={handleToggleStatus}
           />
         )}
+
+        {/* Team Management */}
+        <div className="mt-8">
+          <TeamManagement />
+        </div>
 
         {/* Info Cards */}
         <div className="mt-8 grid gap-6 md:grid-cols-2">
