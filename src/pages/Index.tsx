@@ -1,17 +1,32 @@
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { loadBookings } from '@/lib/bookingStore';
+import { fetchActiveBookings } from '@/lib/bookingService';
 import { BookingConfig } from '@/lib/types';
-import { Calendar, Clock, MapPin, ArrowRight, Settings } from 'lucide-react';
+import { Calendar, Clock, MapPin, ArrowRight, Settings, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function Index() {
   const navigate = useNavigate();
   const [bookings, setBookings] = useState<BookingConfig[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loaded = loadBookings();
-    setBookings(loaded.filter((b) => b.active));
+    const load = async () => {
+      try {
+        setIsLoading(true);
+        const data = await fetchActiveBookings();
+        setBookings(data);
+      } catch (error) {
+        console.error('Error loading bookings:', error);
+        toast.error('No se pudieron cargar los servicios');
+        setBookings([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    load();
   }, []);
 
   return (
@@ -63,7 +78,11 @@ export default function Index() {
             Servicios disponibles
           </h2>
 
-          {bookings.length === 0 ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : bookings.length === 0 ? (
             <div className="text-center py-12 bg-muted/30 rounded-xl border border-dashed border-border">
               <p className="text-muted-foreground mb-2">No hay servicios disponibles</p>
               <p className="text-sm text-muted-foreground mb-4">
