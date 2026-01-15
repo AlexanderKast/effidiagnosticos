@@ -68,56 +68,60 @@ export default function BookingPage() {
     setBooking(found);
   }, [bookingId]);
 
-  // Fetch availability when date is selected
-  // States reset: selectedSlot = null, availableSlots = [], isLoadingSlots = true
-  useEffect(() => {
-    if (!selectedDate || !booking) return;
+  // Fetch availability - called directly when date is selected
+  const fetchAvailability = async (date: Date) => {
+    if (!booking) return;
 
-    const fetchAvailability = async () => {
-      // Reset state before fetching
-      setSelectedTime(null);
-      setAvailableSlots([]);
-      setIsLoadingSlots(true);
+    // Reset state before fetching
+    setSelectedTime(null);
+    setAvailableSlots([]);
+    setIsLoadingSlots(true);
 
-      try {
-        if (booking.n8n_get_availability_url) {
-          const response = await fetch(booking.n8n_get_availability_url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              booking_id: booking.booking_id,
-              date: format(selectedDate, 'yyyy-MM-dd'),
-            }),
-          });
+    try {
+      if (booking.n8n_get_availability_url) {
+        console.log('Fetching availability from:', booking.n8n_get_availability_url);
+        console.log('Request body:', { booking_id: booking.booking_id, date: format(date, 'yyyy-MM-dd') });
+        
+        const response = await fetch(booking.n8n_get_availability_url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            booking_id: booking.booking_id,
+            date: format(date, 'yyyy-MM-dd'),
+          }),
+        });
 
-          if (response.ok) {
-            const data = await response.json();
-            // Support both "slots" and "available_slots" from n8n response
-            const slots = data.slots || data.available_slots || [];
-            setAvailableSlots(slots);
-            setIsLoadingSlots(false);
-            return;
-          }
+        console.log('Response status:', response.status);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Response data:', data);
+          // Support both "slots" and "available_slots" from n8n response
+          const slots = data.slots || data.available_slots || [];
+          setAvailableSlots(slots);
+          setIsLoadingSlots(false);
+          return;
         }
-        // Demo fallback if no URL configured
-        console.log('No n8n URL configured, using demo slots');
-        setAvailableSlots(['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
-      } catch (error) {
-        console.error('Error fetching availability:', error);
-        // Demo fallback on error
-        setAvailableSlots(['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
-      } finally {
-        setIsLoadingSlots(false);
       }
-    };
+      // Demo fallback if no URL configured
+      console.log('No n8n URL configured or request failed, using demo slots');
+      setAvailableSlots(['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
+    } catch (error) {
+      console.error('Error fetching availability:', error);
+      // Demo fallback on error
+      setAvailableSlots(['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
+    } finally {
+      setIsLoadingSlots(false);
+    }
+  };
 
-    fetchAvailability();
-  }, [selectedDate, booking]);
-
+  // Handle date selection - triggers availability fetch IMMEDIATELY
   const handleDateSelect = (date: Date) => {
     setSelectedDate(date);
     setSelectedTime(null);
     setCurrentStep(2);
+    // Trigger webhook immediately on date selection
+    fetchAvailability(date);
   };
 
   const handleTimeSelect = (time: string) => {
