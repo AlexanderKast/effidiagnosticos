@@ -5,6 +5,23 @@ export interface BookingBulletPoint {
   text: string;
 }
 
+// Form field types
+export type FormFieldType = 'text' | 'email' | 'textarea' | 'tel' | 'select';
+
+export interface FormFieldOption {
+  value: string;
+  label: string;
+}
+
+export interface FormField {
+  id: string;
+  label: string;
+  type: FormFieldType;
+  required: boolean;
+  placeholder?: string;
+  options?: FormFieldOption[]; // For select fields
+}
+
 export interface BookingConfig {
   // Identity
   booking_id: string;
@@ -31,6 +48,9 @@ export interface BookingConfig {
   policyText: string;
   requirePolicyAcceptance: boolean;
 
+  // Form fields
+  formFields: FormField[];
+
   // Technical config (per booking)
   n8n_get_availability_url: string;
   n8n_create_booking_url: string;
@@ -42,10 +62,7 @@ export interface BookingConfig {
 }
 
 export interface BookingFormData {
-  name: string;
-  email: string;
-  company?: string;
-  notes?: string;
+  [key: string]: string | boolean;
   acceptedPolicy: boolean;
 }
 
@@ -63,6 +80,14 @@ export interface BookingRequest {
   company?: string;
   notes?: string;
 }
+
+// Default form fields
+export const defaultFormFields: FormField[] = [
+  { id: 'name', label: 'Nombre completo', type: 'text', required: true, placeholder: 'Tu nombre' },
+  { id: 'email', label: 'Email', type: 'email', required: true, placeholder: 'tu@email.com' },
+  { id: 'company', label: 'Empresa', type: 'text', required: false, placeholder: 'Nombre de tu empresa' },
+  { id: 'notes', label: 'Notas adicionales', type: 'textarea', required: false, placeholder: '¿Algo que debamos saber antes de la reunión?' },
+];
 
 // Default booking template
 export const createDefaultBooking = (partial?: Partial<BookingConfig>): BookingConfig => ({
@@ -94,6 +119,7 @@ export const createDefaultBooking = (partial?: Partial<BookingConfig>): BookingC
   ],
   policyText: 'Tus datos serán tratados de forma confidencial y solo se utilizarán para coordinar esta reunión. Recibirás el link de Zoom y la invitación de calendario por correo electrónico.',
   requirePolicyAcceptance: true,
+  formFields: defaultFormFields,
   n8n_get_availability_url: '',
   n8n_create_booking_url: '',
   active: true,

@@ -23,6 +23,7 @@ export type Database = {
           created_at: string
           duration: number
           expectations: Json
+          form_fields: Json
           id: string
           n8n_create_booking_url: string
           n8n_get_availability_url: string
@@ -44,6 +45,7 @@ export type Database = {
           created_at?: string
           duration?: number
           expectations?: Json
+          form_fields?: Json
           id?: string
           n8n_create_booking_url?: string
           n8n_get_availability_url?: string
@@ -65,6 +67,7 @@ export type Database = {
           created_at?: string
           duration?: number
           expectations?: Json
+          form_fields?: Json
           id?: string
           n8n_create_booking_url?: string
           n8n_get_availability_url?: string

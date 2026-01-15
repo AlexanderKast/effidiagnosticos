@@ -43,15 +43,10 @@ export default function BookingPage() {
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Form state
-  const [formData, setFormData] = useState<BookingFormData>({
-    name: '',
-    email: '',
-    company: '',
-    notes: '',
-    acceptedPolicy: false,
-  });
+  // Form state - now dynamic based on formFields
+  const [formData, setFormData] = useState<Record<string, string>>({});
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [acceptedPolicy, setAcceptedPolicy] = useState(false);
 
   // Load booking config from database
   useEffect(() => {
@@ -142,15 +137,22 @@ export default function BookingPage() {
   };
 
   const validateForm = (): boolean => {
+    if (!booking) return false;
     const errors: Record<string, string> = {};
 
-    if (!formData.name.trim()) errors.name = 'Nombre requerido';
-    if (!formData.email.trim()) {
-      errors.email = 'Email requerido';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errors.email = 'Email inválido';
-    }
-    if (booking?.requirePolicyAcceptance && !formData.acceptedPolicy) {
+    // Validate each required field dynamically
+    booking.formFields.forEach(field => {
+      if (field.required) {
+        const value = formData[field.id]?.trim() || '';
+        if (!value) {
+          errors[field.id] = `${field.label} es requerido`;
+        } else if (field.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+          errors[field.id] = 'Email inválido';
+        }
+      }
+    });
+
+    if (booking.requirePolicyAcceptance && !acceptedPolicy) {
       errors.policy = 'Debes aceptar la política de datos';
     }
 
@@ -170,10 +172,7 @@ export default function BookingPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             booking_id: booking.booking_id,
-            name: formData.name,
-            email: formData.email,
-            company: formData.company,
-            notes: formData.notes,
+            ...formData, // Send all dynamic form data
             date: format(selectedDate, 'yyyy-MM-dd'),
             time: selectedTime,
           }),
@@ -399,55 +398,36 @@ export default function BookingPage() {
                   </p>
 
                   <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Nombre *</Label>
-                      <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="Tu nombre completo"
-                        className={formErrors.name ? 'border-destructive' : ''}
-                      />
-                      {formErrors.name && (
-                        <p className="text-sm text-destructive">{formErrors.name}</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email *</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="tu@email.com"
-                        className={formErrors.email ? 'border-destructive' : ''}
-                      />
-                      {formErrors.email && (
-                        <p className="text-sm text-destructive">{formErrors.email}</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="company">Empresa (opcional)</Label>
-                      <Input
-                        id="company"
-                        value={formData.company}
-                        onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                        placeholder="Nombre de tu empresa"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="notes">Notas (opcional)</Label>
-                      <Textarea
-                        id="notes"
-                        value={formData.notes}
-                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                        placeholder="¿Algo que debamos saber antes de la reunión?"
-                        rows={3}
-                      />
-                    </div>
+                    {/* Dynamic Form Fields */}
+                    {booking.formFields.map((field) => (
+                      <div key={field.id} className="space-y-2">
+                        <Label htmlFor={field.id}>
+                          {field.label} {field.required ? '*' : '(opcional)'}
+                        </Label>
+                        {field.type === 'textarea' ? (
+                          <Textarea
+                            id={field.id}
+                            value={formData[field.id] || ''}
+                            onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })}
+                            placeholder={field.placeholder}
+                            className={formErrors[field.id] ? 'border-destructive' : ''}
+                            rows={3}
+                          />
+                        ) : (
+                          <Input
+                            id={field.id}
+                            type={field.type === 'email' ? 'email' : field.type === 'tel' ? 'tel' : 'text'}
+                            value={formData[field.id] || ''}
+                            onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })}
+                            placeholder={field.placeholder}
+                            className={formErrors[field.id] ? 'border-destructive' : ''}
+                          />
+                        )}
+                        {formErrors[field.id] && (
+                          <p className="text-sm text-destructive">{formErrors[field.id]}</p>
+                        )}
+                      </div>
+                    ))}
 
                     {/* Policy Checkbox */}
                     {booking.requirePolicyAcceptance && (
@@ -455,10 +435,8 @@ export default function BookingPage() {
                         <div className="flex items-start gap-3">
                           <Checkbox
                             id="policy"
-                            checked={formData.acceptedPolicy}
-                            onCheckedChange={(checked) =>
-                              setFormData({ ...formData, acceptedPolicy: checked as boolean })
-                            }
+                            checked={acceptedPolicy}
+                            onCheckedChange={(checked) => setAcceptedPolicy(checked as boolean)}
                             className={formErrors.policy ? 'border-destructive' : ''}
                           />
                           <div>
