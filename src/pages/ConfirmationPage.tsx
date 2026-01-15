@@ -90,24 +90,6 @@ export default function ConfirmationPage() {
             </div>
           )}
 
-          {/* Webhook Response Data */}
-          {webhookResponse && Object.keys(webhookResponse).length > 0 && (
-            <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 mb-6 text-left">
-              <h3 className="font-semibold text-foreground text-center mb-3">
-                Información adicional
-              </h3>
-              <div className="space-y-2">
-                {Object.entries(webhookResponse).map(([key, value]) => (
-                  <div key={key} className="text-sm">
-                    <span className="text-muted-foreground">{key}: </span>
-                    <span className="text-foreground">
-                      {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Info Box */}
           <div className="bg-accent rounded-xl p-4 mb-6">
