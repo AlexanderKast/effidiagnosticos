@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BookingConfig, BookingBulletPoint, createDefaultBooking } from '@/lib/types';
-import { isBookingIdUnique, generateSlug } from '@/lib/bookingStore';
+import { checkBookingIdUnique } from '@/lib/bookingService';
+import { generateSlug } from '@/lib/bookingStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,6 +42,7 @@ export function BookingFormModal({
   const [formData, setFormData] = useState<BookingConfig>(createDefaultBooking());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState('identity');
+  const [isValidating, setIsValidating] = useState(false);
 
   useEffect(() => {
     if (booking && mode === 'edit') {
@@ -93,13 +95,16 @@ export function BookingFormModal({
     );
   };
 
-  const validate = (): boolean => {
+  const validate = async (): Promise<boolean> => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.booking_id.trim()) {
       newErrors.booking_id = 'El ID es requerido';
-    } else if (mode === 'create' && !isBookingIdUnique(formData.booking_id)) {
-      newErrors.booking_id = 'Este ID ya existe';
+    } else if (mode === 'create') {
+      const isUnique = await checkBookingIdUnique(formData.booking_id);
+      if (!isUnique) {
+        newErrors.booking_id = 'Este ID ya existe';
+      }
     }
 
     if (!formData.name.trim()) {
@@ -114,8 +119,12 @@ export function BookingFormModal({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
-    if (validate()) {
+  const handleSubmit = async () => {
+    setIsValidating(true);
+    const isValid = await validate();
+    setIsValidating(false);
+    
+    if (isValid) {
       onSave(formData);
       onClose();
     }

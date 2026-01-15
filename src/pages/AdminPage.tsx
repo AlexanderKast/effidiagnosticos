@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BookingConfig } from '@/lib/types';
 import {
-  loadBookings,
-  createBooking,
-  updateBooking,
-  deleteBooking,
-  toggleBookingStatus,
-} from '@/lib/bookingStore';
+  fetchAllBookings,
+  createBookingConfig,
+  updateBookingConfig,
+  deleteBookingConfig,
+  toggleBookingConfigStatus,
+} from '@/lib/bookingService';
+import { useAuth } from '@/hooks/useAuth';
 import { BookingFormModal } from '@/components/admin/BookingFormModal';
 import { BookingsList } from '@/components/admin/BookingsList';
 import { Button } from '@/components/ui/button';
@@ -20,21 +22,46 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Calendar, ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Plus, Calendar, ArrowLeft, LogOut, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function AdminPage() {
   const navigate = useNavigate();
+  const { user, isAdmin, isLoading: authLoading, signOut } = useAuth();
+  
   const [bookings, setBookings] = useState<BookingConfig[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBooking, setEditingBooking] = useState<BookingConfig | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
+  // Redirect if not authenticated or not admin
+  useEffect(() => {
+    if (!authLoading && (!user || !isAdmin)) {
+      toast.error('Acceso denegado. Debes ser administrador.');
+      navigate('/auth');
+    }
+  }, [user, isAdmin, authLoading, navigate]);
+
   // Load bookings on mount
   useEffect(() => {
-    setBookings(loadBookings());
-  }, []);
+    if (user && isAdmin) {
+      loadBookings();
+    }
+  }, [user, isAdmin]);
+
+  const loadBookings = async () => {
+    try {
+      setIsLoading(true);
+      const data = await fetchAllBookings();
+      setBookings(data);
+    } catch (error) {
+      console.error('Error loading bookings:', error);
+      toast.error('Error al cargar los bookings');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleCreateNew = () => {
     setEditingBooking(null);
@@ -46,36 +73,69 @@ export default function AdminPage() {
     setIsModalOpen(true);
   };
 
-  const handleSave = (booking: BookingConfig) => {
-    if (editingBooking) {
-      // Update existing
-      updateBooking(booking.booking_id, booking);
-      toast.success('Booking actualizado correctamente');
-    } else {
-      // Create new
-      createBooking(booking);
-      toast.success('Booking creado correctamente');
+  const handleSave = async (booking: BookingConfig) => {
+    try {
+      if (editingBooking) {
+        await updateBookingConfig(booking.booking_id, booking);
+        toast.success('Booking actualizado correctamente');
+      } else {
+        await createBookingConfig(booking);
+        toast.success('Booking creado correctamente');
+      }
+      await loadBookings();
+    } catch (error: any) {
+      console.error('Error saving booking:', error);
+      toast.error(error.message || 'Error al guardar el booking');
     }
-    setBookings(loadBookings());
   };
 
   const handleDelete = (bookingId: string) => {
     setDeleteConfirmId(bookingId);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (deleteConfirmId) {
-      deleteBooking(deleteConfirmId);
-      setBookings(loadBookings());
-      toast.success('Booking eliminado');
-      setDeleteConfirmId(null);
+      try {
+        await deleteBookingConfig(deleteConfirmId);
+        await loadBookings();
+        toast.success('Booking eliminado');
+      } catch (error) {
+        console.error('Error deleting booking:', error);
+        toast.error('Error al eliminar el booking');
+      } finally {
+        setDeleteConfirmId(null);
+      }
     }
   };
 
-  const handleToggleStatus = (bookingId: string) => {
-    toggleBookingStatus(bookingId);
-    setBookings(loadBookings());
+  const handleToggleStatus = async (bookingId: string) => {
+    try {
+      await toggleBookingConfigStatus(bookingId);
+      await loadBookings();
+    } catch (error) {
+      console.error('Error toggling status:', error);
+      toast.error('Error al cambiar el estado');
+    }
   };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Don't render if not admin (will redirect)
+  if (!user || !isAdmin) {
+    return null;
+  }
 
   const activeCount = bookings.filter((b) => b.active).length;
 
@@ -106,10 +166,18 @@ export default function AdminPage() {
                 </div>
               </div>
             </div>
-            <Button onClick={handleCreateNew} className="gap-2">
-              <Plus className="w-4 h-4" />
-              Nuevo Booking
-            </Button>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground hidden md:block">
+                {user.email}
+              </span>
+              <Button onClick={handleCreateNew} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Nuevo Booking
+              </Button>
+              <Button variant="ghost" size="icon" onClick={handleSignOut}>
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -124,7 +192,7 @@ export default function AdminPage() {
           </div>
           <div className="bg-card rounded-xl border border-border p-4">
             <p className="text-sm text-muted-foreground">Activos</p>
-            <p className="text-2xl font-bold text-success">{activeCount}</p>
+            <p className="text-2xl font-bold text-green-500">{activeCount}</p>
           </div>
           <div className="bg-card rounded-xl border border-border p-4">
             <p className="text-sm text-muted-foreground">Pausados</p>
@@ -144,13 +212,19 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Bookings List */}
-        <BookingsList
-          bookings={bookings}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onToggleStatus={handleToggleStatus}
-        />
+        {/* Loading State */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <BookingsList
+            bookings={bookings}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onToggleStatus={handleToggleStatus}
+          />
+        )}
 
         {/* Info Cards */}
         <div className="mt-8 grid gap-6 md:grid-cols-2">

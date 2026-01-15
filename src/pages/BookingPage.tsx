@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { BookingConfig, BookingFormData } from '@/lib/types';
-import { getBookingById } from '@/lib/bookingStore';
+import { fetchBookingById } from '@/lib/bookingService';
 import { StepIndicator } from '@/components/booking/StepIndicator';
 import { DatePickerStep } from '@/components/booking/DatePickerStep';
 import { TimeSlotStep } from '@/components/booking/TimeSlotStep';
@@ -35,6 +35,7 @@ export default function BookingPage() {
 
   const [booking, setBooking] = useState<BookingConfig | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [isLoadingBooking, setIsLoadingBooking] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -52,20 +53,31 @@ export default function BookingPage() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  // Load booking config
+  // Load booking config from database
   useEffect(() => {
-    if (!bookingId) {
-      setNotFound(true);
-      return;
-    }
+    const loadBooking = async () => {
+      if (!bookingId) {
+        setNotFound(true);
+        setIsLoadingBooking(false);
+        return;
+      }
 
-    const found = getBookingById(bookingId);
-    if (!found || !found.active) {
-      setNotFound(true);
-      return;
-    }
+      try {
+        const found = await fetchBookingById(bookingId);
+        if (!found || !found.active) {
+          setNotFound(true);
+        } else {
+          setBooking(found);
+        }
+      } catch (error) {
+        console.error('Error loading booking:', error);
+        setNotFound(true);
+      } finally {
+        setIsLoadingBooking(false);
+      }
+    };
 
-    setBooking(found);
+    loadBooking();
   }, [bookingId]);
 
   // Fetch availability - called directly when date is selected
@@ -201,7 +213,7 @@ export default function BookingPage() {
   }
 
   // Loading State
-  if (!booking) {
+  if (isLoadingBooking || !booking) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
