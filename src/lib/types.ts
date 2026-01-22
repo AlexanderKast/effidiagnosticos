@@ -5,6 +5,57 @@ export interface BookingBulletPoint {
   text: string;
 }
 
+// Tracking Pixel Types
+export type PixelPlatform = 'facebook' | 'google_analytics' | 'google_ads' | 'tiktok' | 'linkedin' | 'twitter' | 'custom';
+
+export type PixelTrigger = 'page_view' | 'start_booking' | 'select_date' | 'select_time' | 'form_submit' | 'booking_complete';
+
+export interface PixelEvent {
+  id: string;
+  eventName: string;        // The event name to send (e.g., "Lead", "Schedule", "CompleteRegistration")
+  triggerOn: PixelTrigger;  // When to fire this event
+  customParameters?: Record<string, string>; // Additional parameters to send
+}
+
+export interface TrackingPixel {
+  id: string;
+  platform: PixelPlatform;
+  pixelId: string;          // The pixel/measurement ID
+  enabled: boolean;
+  events: PixelEvent[];
+}
+
+// Platform display info
+export const PIXEL_PLATFORMS: Record<PixelPlatform, { name: string; idLabel: string; placeholder: string }> = {
+  facebook: { name: 'Facebook Pixel', idLabel: 'Pixel ID', placeholder: 'Ej: 123456789012345' },
+  google_analytics: { name: 'Google Analytics 4', idLabel: 'Measurement ID', placeholder: 'Ej: G-XXXXXXXXXX' },
+  google_ads: { name: 'Google Ads', idLabel: 'Conversion ID', placeholder: 'Ej: AW-123456789' },
+  tiktok: { name: 'TikTok Pixel', idLabel: 'Pixel ID', placeholder: 'Ej: XXXXXXXXXXXXXXXXX' },
+  linkedin: { name: 'LinkedIn Insight Tag', idLabel: 'Partner ID', placeholder: 'Ej: 123456' },
+  twitter: { name: 'Twitter Pixel', idLabel: 'Pixel ID', placeholder: 'Ej: xxxxx' },
+  custom: { name: 'Pixel Personalizado', idLabel: 'ID', placeholder: 'ID del pixel' },
+};
+
+export const PIXEL_TRIGGERS: Record<PixelTrigger, { name: string; description: string }> = {
+  page_view: { name: 'Vista de página', description: 'Cuando el usuario abre la página de booking' },
+  start_booking: { name: 'Inicio de reserva', description: 'Cuando el usuario empieza el proceso' },
+  select_date: { name: 'Selección de fecha', description: 'Cuando selecciona una fecha' },
+  select_time: { name: 'Selección de hora', description: 'Cuando selecciona un horario' },
+  form_submit: { name: 'Envío de formulario', description: 'Cuando envía el formulario final' },
+  booking_complete: { name: 'Reserva completada', description: 'Cuando se confirma la reserva' },
+};
+
+// Standard events per platform
+export const STANDARD_EVENTS: Record<PixelPlatform, string[]> = {
+  facebook: ['PageView', 'Lead', 'Schedule', 'CompleteRegistration', 'Contact', 'SubmitApplication', 'ViewContent'],
+  google_analytics: ['page_view', 'generate_lead', 'sign_up', 'begin_checkout', 'purchase', 'view_item'],
+  google_ads: ['conversion', 'page_view', 'submit_lead_form'],
+  tiktok: ['PageView', 'ClickButton', 'SubmitForm', 'CompleteRegistration', 'Contact', 'Schedule'],
+  linkedin: ['conversion', 'page_view'],
+  twitter: ['PageView', 'Lead', 'SignUp', 'Purchase'],
+  custom: ['custom_event'],
+};
+
 // Form field types
 export type FormFieldType = 
   | 'text' 
@@ -75,6 +126,9 @@ export interface BookingConfig {
   // Form fields
   formFields: FormField[];
 
+  // Tracking pixels
+  trackingPixels: TrackingPixel[];
+
   // Technical config (per booking)
   n8n_get_availability_url: string;
   n8n_create_booking_url: string;
@@ -144,6 +198,7 @@ export const createDefaultBooking = (partial?: Partial<BookingConfig>): BookingC
   policyText: 'Tus datos serán tratados de forma confidencial y solo se utilizarán para coordinar esta reunión. Recibirás el link de Zoom y la invitación de calendario por correo electrónico.',
   requirePolicyAcceptance: true,
   formFields: defaultFormFields,
+  trackingPixels: [],
   n8n_get_availability_url: '',
   n8n_create_booking_url: '',
   active: true,

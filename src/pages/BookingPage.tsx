@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { BookingConfig, FormField } from '@/lib/types';
 import { fetchBookingById } from '@/lib/bookingService';
+import { useTrackingPixels } from '@/hooks/useTrackingPixels';
 import { StepIndicator } from '@/components/booking/StepIndicator';
 import { DatePickerStep } from '@/components/booking/DatePickerStep';
 import { TimeSlotStep } from '@/components/booking/TimeSlotStep';
@@ -82,6 +83,21 @@ export default function BookingPage() {
     if (!booking) return [];
     return booking.formFields.filter(isFieldVisible);
   }, [booking, isFieldVisible]);
+
+  // Initialize tracking pixels
+  const { trackEvent } = useTrackingPixels({
+    pixels: booking?.trackingPixels || [],
+    bookingId: bookingId || '',
+  });
+
+  // Track page view when booking loads
+  useEffect(() => {
+    if (booking) {
+      trackEvent('page_view');
+      trackEvent('start_booking');
+    }
+  }, [booking, trackEvent]);
+
   useEffect(() => {
     const loadBooking = async () => {
       if (!bookingId) {
@@ -160,6 +176,8 @@ export default function BookingPage() {
     setSelectedDate(date);
     setSelectedTime(null);
     setCurrentStep(2);
+    // Track date selection
+    trackEvent('select_date', { date: format(date, 'yyyy-MM-dd') });
     // Trigger webhook immediately on date selection
     fetchAvailability(date);
   };
@@ -167,6 +185,8 @@ export default function BookingPage() {
   const handleTimeSelect = (time: string) => {
     setSelectedTime(time);
     setCurrentStep(3);
+    // Track time selection
+    trackEvent('select_time', { time });
   };
 
   const validateForm = (): boolean => {
@@ -214,6 +234,12 @@ export default function BookingPage() {
     if (!validateForm() || !booking || !selectedDate || !selectedTime) return;
 
     setIsSubmitting(true);
+    
+    // Track form submission
+    trackEvent('form_submit', { 
+      date: format(selectedDate, 'yyyy-MM-dd'), 
+      time: selectedTime 
+    });
 
     try {
       // Transform formData to use visible labels instead of internal IDs
@@ -261,6 +287,13 @@ export default function BookingPage() {
         } catch {
           // Response might not be JSON
         }
+        
+        // Track booking complete
+        trackEvent('booking_complete', { 
+          date: format(selectedDate, 'yyyy-MM-dd'), 
+          time: selectedTime,
+          booking_name: booking.name
+        });
         
         navigate('/confirmacion', { 
           state: { 
