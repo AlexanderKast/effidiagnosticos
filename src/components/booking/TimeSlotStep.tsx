@@ -50,7 +50,7 @@ export function TimeSlotStep({
   // Render available slots as buttons
   return (
     <div className="animate-fade-in">
-      <h2 className="text-xl font-semibold text-foreground mb-6">
+      <h2 className="text-xl font-semibold mb-6">
         Selecciona un horario
       </h2>
 
@@ -61,11 +61,11 @@ export function TimeSlotStep({
             key={slot}
             onClick={() => onSelectTime(slot)}
             className={cn(
-              'time-slot py-3 px-4 rounded-lg border-2 text-center font-medium transition-all',
-              'hover:border-primary hover:bg-primary/5',
+              'py-3 px-4 rounded-lg border-2 text-center font-medium transition-all duration-200',
+              'hover:border-primary hover:bg-primary/10 hover:scale-[1.02]',
               selectedTime === slot 
-                ? 'time-slot-selected border-primary bg-primary text-primary-foreground' 
-                : 'border-border bg-background text-foreground'
+                ? 'border-primary bg-primary text-primary-foreground shadow-md' 
+                : 'border-border bg-background text-primary'
             )}
           >
             {slot}
@@ -77,7 +77,7 @@ export function TimeSlotStep({
       {selectedTime && (
         <p className="mt-6 text-center text-muted-foreground">
           Horario seleccionado:{' '}
-          <span className="font-medium text-foreground">{selectedTime}</span>
+          <span className="font-medium text-primary">{selectedTime}</span>
         </p>
       )}
     </div>

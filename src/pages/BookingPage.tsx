@@ -33,6 +33,7 @@ import {
   Mail,
   Loader2,
 } from 'lucide-react';
+import grupoEffiLogo from '@/assets/grupo-effi-logo.jpg';
 
 const STEP_LABELS = ['Fecha', 'Hora', 'Datos'];
 
@@ -339,12 +340,18 @@ export default function BookingPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-40">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-            <span className="text-lg font-bold text-primary-foreground">EC</span>
-          </div>
-          <span className="font-medium text-foreground">Efficommerce</span>
+      <header className="border-b border-border bg-primary sticky top-0 z-40">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
+          <button 
+            onClick={() => navigate('/')}
+            className="flex items-center gap-3 hover:opacity-90 transition-opacity"
+          >
+            <img 
+              src={grupoEffiLogo} 
+              alt="Grupo Effi" 
+              className="h-10 md:h-12 w-auto rounded-lg"
+            />
+          </button>
         </div>
       </header>
 

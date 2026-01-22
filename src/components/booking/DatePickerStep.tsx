@@ -32,7 +32,7 @@ export function DatePickerStep({ selectedDate, onSelectDate }: DatePickerStepPro
 
   return (
     <div className="animate-fade-in">
-      <h2 className="text-xl font-semibold text-foreground mb-6">
+      <h2 className="text-xl font-semibold mb-6">
         Selecciona una fecha
       </h2>
 
@@ -43,18 +43,18 @@ export function DatePickerStep({ selectedDate, onSelectDate }: DatePickerStepPro
             variant="ghost"
             size="icon"
             onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-            className="hover:bg-accent"
+            className="text-primary hover:bg-accent hover:text-primary"
           >
             <ChevronLeft className="w-5 h-5" />
           </Button>
-          <h3 className="text-lg font-semibold capitalize">
+          <h3 className="text-lg font-semibold capitalize text-foreground">
             {format(currentMonth, 'MMMM yyyy', { locale: es })}
           </h3>
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-            className="hover:bg-accent"
+            className="text-primary hover:bg-accent hover:text-primary"
           >
             <ChevronRight className="w-5 h-5" />
           </Button>
@@ -65,7 +65,7 @@ export function DatePickerStep({ selectedDate, onSelectDate }: DatePickerStepPro
           {weekDays.map((day) => (
             <div
               key={day}
-              className="text-center text-sm font-medium text-muted-foreground py-2"
+              className="text-center text-sm font-medium text-primary/70 py-2"
             >
               {day}
             </div>
@@ -91,10 +91,11 @@ export function DatePickerStep({ selectedDate, onSelectDate }: DatePickerStepPro
                 onClick={() => !disabled && onSelectDate(day)}
                 disabled={disabled}
                 className={cn(
-                  'date-cell',
-                  selected && 'date-cell-selected',
-                  disabled && 'date-cell-disabled',
-                  today && !selected && 'ring-1 ring-primary',
+                  'date-cell transition-all duration-200',
+                  !disabled && !selected && 'text-primary hover:bg-primary/10',
+                  selected && 'date-cell-selected bg-primary text-primary-foreground',
+                  disabled && 'date-cell-disabled text-muted-foreground/50',
+                  today && !selected && 'ring-2 ring-primary font-bold',
                 )}
               >
                 {format(day, 'd')}
@@ -107,7 +108,7 @@ export function DatePickerStep({ selectedDate, onSelectDate }: DatePickerStepPro
       {selectedDate && (
         <p className="mt-4 text-center text-muted-foreground">
           Fecha seleccionada:{' '}
-          <span className="font-medium text-foreground">
+          <span className="font-medium text-primary">
             {format(selectedDate, "EEEE, d 'de' MMMM", { locale: es })}
           </span>
         </p>
