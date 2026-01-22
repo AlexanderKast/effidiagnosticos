@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BookingConfig, BookingBulletPoint, FormField, createDefaultBooking } from '@/lib/types';
+import { BookingConfig, BookingBulletPoint, FormField, TrackingPixel, createDefaultBooking } from '@/lib/types';
 import { checkBookingIdUnique } from '@/lib/bookingService';
 import { generateSlug } from '@/lib/bookingStore';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/tabs';
 import { Plus, Trash2 } from 'lucide-react';
 import { FormFieldsEditor } from './FormFieldsEditor';
+import { TrackingPixelsEditor } from './TrackingPixelsEditor';
 
 interface BookingFormModalProps {
   open: boolean;
@@ -185,12 +186,13 @@ export function BookingFormModal({
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-          <TabsList className="grid grid-cols-5 w-full">
+          <TabsList className="grid grid-cols-6 w-full">
             <TabsTrigger value="identity">Identidad</TabsTrigger>
             <TabsTrigger value="content">Contenido</TabsTrigger>
             <TabsTrigger value="audience">Audiencia</TabsTrigger>
             <TabsTrigger value="form">Formulario</TabsTrigger>
-            <TabsTrigger value="config">Configuración</TabsTrigger>
+            <TabsTrigger value="tracking">Tracking</TabsTrigger>
+            <TabsTrigger value="config">Config</TabsTrigger>
           </TabsList>
 
           {/* Identity Tab */}
@@ -297,6 +299,14 @@ export function BookingFormModal({
             <FormFieldsEditor
               fields={formData.formFields}
               onChange={(fields: FormField[]) => updateField('formFields', fields)}
+            />
+          </TabsContent>
+
+          {/* Tracking Pixels Tab */}
+          <TabsContent value="tracking" className="mt-4">
+            <TrackingPixelsEditor
+              pixels={formData.trackingPixels || []}
+              onChange={(pixels: TrackingPixel[]) => updateField('trackingPixels', pixels)}
             />
           </TabsContent>
 

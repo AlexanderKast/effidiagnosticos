@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { BookingConfig, BookingBulletPoint, FormField, defaultFormFields } from './types';
+import { BookingConfig, BookingBulletPoint, FormField, TrackingPixel, defaultFormFields } from './types';
 
 // Helper to convert DB row to BookingConfig
 const dbToBookingConfig = (row: any): BookingConfig => ({
@@ -17,6 +17,7 @@ const dbToBookingConfig = (row: any): BookingConfig => ({
   policyText: row.policy_text || '',
   requirePolicyAcceptance: row.require_policy_acceptance ?? true,
   formFields: (row.form_fields as FormField[]) || defaultFormFields,
+  trackingPixels: (row.tracking_pixels as TrackingPixel[]) || [],
   n8n_get_availability_url: row.n8n_get_availability_url || '',
   n8n_create_booking_url: row.n8n_create_booking_url || '',
   active: row.active ?? true,
@@ -40,6 +41,7 @@ const bookingConfigToDb = (booking: BookingConfig) => ({
   policy_text: booking.policyText,
   require_policy_acceptance: booking.requirePolicyAcceptance,
   form_fields: JSON.parse(JSON.stringify(booking.formFields)),
+  tracking_pixels: JSON.parse(JSON.stringify(booking.trackingPixels || [])),
   n8n_get_availability_url: booking.n8n_get_availability_url,
   n8n_create_booking_url: booking.n8n_create_booking_url,
   active: booking.active,
@@ -129,6 +131,7 @@ export const updateBookingConfig = async (bookingId: string, updates: Partial<Bo
   if (updates.policyText !== undefined) updateData.policy_text = updates.policyText;
   if (updates.requirePolicyAcceptance !== undefined) updateData.require_policy_acceptance = updates.requirePolicyAcceptance;
   if (updates.formFields !== undefined) updateData.form_fields = updates.formFields;
+  if (updates.trackingPixels !== undefined) updateData.tracking_pixels = updates.trackingPixels;
   if (updates.n8n_get_availability_url !== undefined) updateData.n8n_get_availability_url = updates.n8n_get_availability_url;
   if (updates.n8n_create_booking_url !== undefined) updateData.n8n_create_booking_url = updates.n8n_create_booking_url;
   if (updates.active !== undefined) updateData.active = updates.active;
