@@ -4,13 +4,15 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { isWeekendOrHoliday } from '@/lib/holidays';
 
 interface DatePickerStepProps {
   selectedDate: Date | null;
   onSelectDate: (date: Date) => void;
+  country?: string;
 }
 
-export function DatePickerStep({ selectedDate, onSelectDate }: DatePickerStepProps) {
+export function DatePickerStep({ selectedDate, onSelectDate, country = 'CO' }: DatePickerStepProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const monthStart = startOfMonth(currentMonth);
@@ -28,6 +30,10 @@ export function DatePickerStep({ selectedDate, onSelectDate }: DatePickerStepPro
 
   const isSelected = (date: Date) => {
     return selectedDate && format(date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
+  };
+
+  const isUnavailable = (date: Date) => {
+    return isWeekendOrHoliday(date, country);
   };
 
   return (
@@ -81,7 +87,7 @@ export function DatePickerStep({ selectedDate, onSelectDate }: DatePickerStepPro
 
           {/* Days of the month */}
           {days.map((day) => {
-            const disabled = isPastDate(day) || !isSameMonth(day, currentMonth);
+            const disabled = isPastDate(day) || !isSameMonth(day, currentMonth) || isUnavailable(day);
             const selected = isSelected(day);
             const today = isToday(day);
 

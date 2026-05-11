@@ -525,6 +525,7 @@ export default function BookingPage() {
                 <DatePickerStep
                   selectedDate={selectedDate}
                   onSelectDate={handleDateSelect}
+                  country={booking?.country || 'CO'}
                 />
               )}
 
