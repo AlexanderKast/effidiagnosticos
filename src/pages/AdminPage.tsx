@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { BookingFormModal } from '@/components/admin/BookingFormModal';
 import { BookingsList } from '@/components/admin/BookingsList';
 import { TeamManagement } from '@/components/admin/TeamManagement';
+import { CommercialCalendarsManager } from '@/components/admin/CommercialCalendarsManager';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -227,6 +228,11 @@ export default function AdminPage() {
           />
         )}
 
+        {/* Comerciales */}
+        <div className="mt-8 bg-card rounded-xl border border-border p-6">
+          <CommercialCalendarsManager />
+        </div>
+
         {/* Team Management */}
         <div className="mt-8">
           <TeamManagement />
@@ -237,9 +243,9 @@ export default function AdminPage() {
           <div className="bg-card rounded-xl border border-border p-6">
             <h3 className="font-semibold text-foreground mb-2">Cómo funciona</h3>
             <ul className="text-sm text-muted-foreground space-y-2">
-              <li>• Cada booking tiene sus propias URLs de n8n</li>
-              <li>• El frontend solo renderiza, no tiene lógica de negocio</li>
-              <li>• Los horarios vienen de n8n (o modo demo si no está configurado)</li>
+              <li>• Cada booking se asigna a un comercial con su calendario</li>
+              <li>• Las citas se guardan en Supabase como fuente de verdad</li>
+              <li>• Google Calendar se sincroniza automáticamente</li>
               <li>• Puedes pausar/activar bookings sin eliminarlos</li>
             </ul>
           </div>
@@ -248,7 +254,7 @@ export default function AdminPage() {
             <h3 className="font-semibold text-foreground mb-2">Estructura de URLs</h3>
             <div className="space-y-2 font-mono text-sm">
               <p className="text-primary">/booking/ventas-colombia</p>
-              <p className="text-primary">/booking/onboarding-latam</p>
+              <p className="text-primary">/booking/diagnostico-inicial</p>
               <p className="text-primary">/booking/soporte-mx</p>
             </div>
             <p className="text-xs text-muted-foreground mt-3">

@@ -129,9 +129,7 @@ export interface BookingConfig {
   // Tracking pixels
   trackingPixels: TrackingPixel[];
 
-  // Technical config (per booking)
-  n8n_get_availability_url: string;
-  n8n_create_booking_url: string;
+  // Backend config
   use_supabase_backend: boolean;
 
   // Status
@@ -200,9 +198,7 @@ export const createDefaultBooking = (partial?: Partial<BookingConfig>): BookingC
   requirePolicyAcceptance: true,
   formFields: defaultFormFields,
   trackingPixels: [],
-  n8n_get_availability_url: '',
-  n8n_create_booking_url: '',
-  use_supabase_backend: false,
+  use_supabase_backend: true,
   active: true,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),

@@ -18,9 +18,7 @@ const dbToBookingConfig = (row: any): BookingConfig => ({
   requirePolicyAcceptance: row.require_policy_acceptance ?? true,
   formFields: (row.form_fields as FormField[]) || defaultFormFields,
   trackingPixels: (row.tracking_pixels as TrackingPixel[]) || [],
-  n8n_get_availability_url: row.n8n_get_availability_url || '',
-  n8n_create_booking_url: row.n8n_create_booking_url || '',
-  use_supabase_backend: row.use_supabase_backend ?? false,
+  use_supabase_backend: row.use_supabase_backend ?? true,
   active: row.active ?? true,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -43,8 +41,6 @@ const bookingConfigToDb = (booking: BookingConfig) => ({
   require_policy_acceptance: booking.requirePolicyAcceptance,
   form_fields: JSON.parse(JSON.stringify(booking.formFields)),
   tracking_pixels: JSON.parse(JSON.stringify(booking.trackingPixels || [])),
-  n8n_get_availability_url: booking.n8n_get_availability_url,
-  n8n_create_booking_url: booking.n8n_create_booking_url,
   active: booking.active,
 });
 
@@ -133,8 +129,6 @@ export const updateBookingConfig = async (bookingId: string, updates: Partial<Bo
   if (updates.requirePolicyAcceptance !== undefined) updateData.require_policy_acceptance = updates.requirePolicyAcceptance;
   if (updates.formFields !== undefined) updateData.form_fields = updates.formFields;
   if (updates.trackingPixels !== undefined) updateData.tracking_pixels = updates.trackingPixels;
-  if (updates.n8n_get_availability_url !== undefined) updateData.n8n_get_availability_url = updates.n8n_get_availability_url;
-  if (updates.n8n_create_booking_url !== undefined) updateData.n8n_create_booking_url = updates.n8n_create_booking_url;
   if (updates.use_supabase_backend !== undefined) updateData.use_supabase_backend = updates.use_supabase_backend;
   if (updates.active !== undefined) updateData.active = updates.active;
 

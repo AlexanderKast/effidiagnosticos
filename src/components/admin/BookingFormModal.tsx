@@ -2,6 +2,12 @@ import { useState, useEffect } from 'react';
 import { BookingConfig, BookingBulletPoint, FormField, TrackingPixel, createDefaultBooking } from '@/lib/types';
 import { checkBookingIdUnique } from '@/lib/bookingService';
 import { generateSlug } from '@/lib/bookingStore';
+import {
+  CommercialCalendar,
+  fetchCommercialCalendars,
+  groupByCountry,
+  getCountryName,
+} from '@/lib/commercialCalendarsService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,6 +25,15 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
 import { FormFieldsEditor } from './FormFieldsEditor';
 import { TrackingPixelsEditor } from './TrackingPixelsEditor';
@@ -45,6 +60,11 @@ export function BookingFormModal({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState('identity');
   const [isValidating, setIsValidating] = useState(false);
+  const [commercials, setCommercials] = useState<CommercialCalendar[]>([]);
+
+  useEffect(() => {
+    fetchCommercialCalendars(true).then(setCommercials).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (booking && mode === 'edit') {
@@ -312,66 +332,37 @@ export function BookingFormModal({
 
           {/* Config Tab */}
           <TabsContent value="config" className="space-y-4 mt-4">
-            {/* Backend selector */}
-            <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-              <div>
-                <Label className="font-medium">Backend: Supabase Edge Functions</Label>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Activo → usa Edge Functions (sin N8N). Inactivo → usa URLs de N8N.
-                </p>
-              </div>
-              <Switch
-                checked={formData.use_supabase_backend}
-                onCheckedChange={(checked) => updateField('use_supabase_backend', checked)}
-              />
+            {/* Comercial asignado */}
+            <div className="space-y-2">
+              <Label>Comercial asignado</Label>
+              <Select
+                value={(formData as BookingConfig & { gcal_calendar_id?: string }).gcal_calendar_id ?? ''}
+                onValueChange={(calId) => {
+                  updateField('gcal_calendar_id' as keyof BookingConfig, calId as never);
+                  updateField('use_supabase_backend', true);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un comercial..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(groupByCountry(commercials)).sort().map(([country, list]) => (
+                    <SelectGroup key={country}>
+                      <SelectLabel>{getCountryName(country)}</SelectLabel>
+                      {list.map((c) => (
+                        <SelectItem key={c.id} value={c.calendar_id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Las citas de este booking van al calendario del comercial seleccionado.
+                Administra comerciales en la sección "Comerciales" del panel.
+              </p>
             </div>
-
-            {/* Calendario de Google (solo cuando Supabase backend está activo) */}
-            {formData.use_supabase_backend && (
-              <div className="space-y-2">
-                <Label htmlFor="gcal_calendar_id">Calendario de Google del comercial</Label>
-                <Input
-                  id="gcal_calendar_id"
-                  value={(formData as BookingConfig & { gcal_calendar_id?: string }).gcal_calendar_id ?? 'primary'}
-                  onChange={(e) => updateField('gcal_calendar_id' as keyof BookingConfig, e.target.value as never)}
-                  placeholder="juan.perez@effi.com o primary"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Email del comercial cuyo calendario compartió contigo, o "primary" para tu calendario.
-                </p>
-              </div>
-            )}
-
-            {/* URLs N8N (solo cuando Supabase backend está inactivo) */}
-            {!formData.use_supabase_backend && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="n8n_availability">URL n8n - Disponibilidad</Label>
-                  <Input
-                    id="n8n_availability"
-                    value={formData.n8n_get_availability_url}
-                    onChange={(e) => updateField('n8n_get_availability_url', e.target.value)}
-                    placeholder="https://tu-n8n.com/webhook/disponibilidad"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Webhook para obtener horarios disponibles
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="n8n_booking">URL n8n - Crear reserva</Label>
-                  <Input
-                    id="n8n_booking"
-                    value={formData.n8n_create_booking_url}
-                    onChange={(e) => updateField('n8n_create_booking_url', e.target.value)}
-                    placeholder="https://tu-n8n.com/webhook/reserva"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Webhook para confirmar la cita
-                  </p>
-                </div>
-              </>
-            )}
 
             <div className="space-y-2">
               <Label htmlFor="policyText">Texto de política de datos</Label>
