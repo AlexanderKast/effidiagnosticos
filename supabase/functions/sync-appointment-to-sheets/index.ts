@@ -1,20 +1,22 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const COUNTRY_NAMES: Record<string, string> = {
-  CO: 'Colombia',
+  CO: 'Metricas COL',
+  GT: 'Metricas GT',
+  DO: 'Metricas RD',
+  RD: 'Metricas RD',
+  EC: 'Metricas EC',
+  CR: 'Metricas CR',
   MX: 'México',
   PE: 'Perú',
   AR: 'Argentina',
   CL: 'Chile',
-  EC: 'Ecuador',
   VE: 'Venezuela',
   US: 'Estados Unidos',
   BO: 'Bolivia',
   PY: 'Paraguay',
   UY: 'Uruguay',
-  CR: 'Costa Rica',
   PA: 'Panamá',
-  GT: 'Guatemala',
   HN: 'Honduras',
 };
 
