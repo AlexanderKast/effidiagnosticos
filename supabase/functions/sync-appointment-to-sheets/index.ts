@@ -18,12 +18,16 @@ const COUNTRY_NAMES: Record<string, string> = {
   HN: 'Honduras',
 };
 
+// id is first column so UPDATE can find rows by UUID
 const SHEET_HEADERS = [
+  'id',
   'booking_id', 'service_name', 'country', 'date', 'time', 'timezone',
   'duration_min', 'name', 'email', 'whatsapp', 'tipo_cliente', 'perfil_resumen',
   'empresa', 'ya_vende', 'tipo_pago', 'tiene_web', 'usa_chatbot', 'envios_mes',
   'tipo_comerciante', 'notes', 'assigned_user', 'assigned_calendar_id',
   'commercial_id', 'gcal_event_id', 'gcal_event_link', 'status', 'created_at',
+  'crm_estado', 'crm_venta_realizada', 'crm_monto_venta',
+  'crm_tipo_cliente', 'crm_tipo_marketing', 'crm_canal_origen', 'crm_observaciones',
 ];
 
 // ── Google Service Account JWT + token ──────────────────────────────────────
@@ -42,7 +46,6 @@ async function getGoogleAccessToken(serviceAccountKey: Record<string, string>): 
 
   const message = `${headerB64}.${payloadB64}`;
 
-  // Import RSA private key
   const pemBody = serviceAccountKey.private_key
     .replace(/-----BEGIN PRIVATE KEY-----/, '')
     .replace(/-----END PRIVATE KEY-----/, '')
@@ -62,8 +65,7 @@ async function getGoogleAccessToken(serviceAccountKey: Record<string, string>): 
     cryptoKey,
     new TextEncoder().encode(message),
   );
-  const sigB64 = base64url(sig);
-  const jwt = `${message}.${sigB64}`;
+  const jwt = `${message}.${base64url(sig)}`;
 
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -124,7 +126,6 @@ async function createTab(token: string, sheetId: string, tabName: string): Promi
     `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`,
     { requests: [{ addSheet: { properties: { title: tabName } } }] },
   );
-  // Write headers on new tab
   await appendRows(token, sheetId, tabName, [SHEET_HEADERS]);
 }
 
@@ -145,6 +146,106 @@ async function appendRows(
   }
 }
 
+function colLetter(n: number): string {
+  let letter = '';
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    letter = String.fromCharCode(65 + rem) + letter;
+    n = Math.floor((n - 1) / 26);
+  }
+  return letter;
+}
+
+// Searches column A for the appointment UUID. Returns 1-based row number or null.
+async function findRowById(
+  token: string,
+  sheetId: string,
+  tab: string,
+  appointmentId: string,
+): Promise<number | null> {
+  const url =
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/` +
+    `${encodeURIComponent(tab)}!A:A`;
+  const res = await sheetsRequest(token, 'GET', url);
+  if (!res.ok) return null;
+  const data = await res.json();
+  const values: string[][] = data.values ?? [];
+  for (let i = 1; i < values.length; i++) {
+    if (values[i][0] === appointmentId) return i + 1;
+  }
+  return null;
+}
+
+async function updateRow(
+  token: string,
+  sheetId: string,
+  tab: string,
+  rowNumber: number,
+  values: string[],
+): Promise<void> {
+  const lastCol = colLetter(values.length);
+  const range = `${encodeURIComponent(tab)}!A${rowNumber}:${lastCol}${rowNumber}`;
+  const url =
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}` +
+    `?valueInputOption=USER_ENTERED`;
+
+  const res = await sheetsRequest(token, 'PUT', url, { values: [values] });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Sheets update failed ${res.status}: ${err}`);
+  }
+}
+
+// ── Row builder ─────────────────────────────────────────────────────────────
+
+function buildRow(
+  appt: Record<string, any>,
+  bc: Record<string, any> | null,
+  assignedUser: string,
+  assignedCalendarId: string,
+  commercialId: string,
+  countryTab: string,
+): string[] {
+  const fd: Record<string, string> = appt.form_data ?? {};
+  return [
+    appt.id ?? '',
+    appt.booking_id ?? '',
+    bc?.name ?? '',
+    countryTab,
+    appt.appointment_date ?? '',
+    appt.start_time ?? '',
+    appt.timezone ?? '',
+    String(appt.duration_minutes ?? ''),
+    appt.lead_name ?? '',
+    appt.lead_email ?? '',
+    fd.whatsapp ?? '',
+    fd.tipo_cliente ?? '',
+    fd.perfil_resumen ?? '',
+    appt.lead_company ?? fd.empresa ?? '',
+    fd.ya_vende ?? '',
+    fd.tipo_pago ?? '',
+    fd.tiene_web ?? '',
+    fd.usa_chatbot ?? '',
+    fd.envios_mes ?? '',
+    fd.tipo_comerciante ?? '',
+    appt.lead_notes ?? fd.notes ?? '',
+    assignedUser,
+    assignedCalendarId,
+    commercialId,
+    appt.gcal_event_id ?? '',
+    appt.gcal_html_link ?? '',
+    appt.status ?? '',
+    appt.created_at ?? '',
+    appt.crm_estado_cliente ?? '',
+    appt.crm_venta_realizada ? 'TRUE' : 'FALSE',
+    appt.crm_monto_venta != null ? String(appt.crm_monto_venta) : '',
+    appt.crm_tipo_cliente ?? '',
+    appt.crm_tipo_marketing ?? '',
+    appt.crm_canal_origen ?? '',
+    appt.crm_observaciones ?? '',
+  ];
+}
+
 // ── Main handler ────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -154,7 +255,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    // Supabase Database Webhook payload: { type, table, schema, record, old_record }
+    const eventType: string = body.type ?? 'INSERT';
     const appt = body.record;
     if (!appt) return new Response('No record', { status: 400 });
 
@@ -163,14 +264,12 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    // Fetch booking config → service_name + country
     const { data: bc } = await supabase
       .from('booking_configs')
       .select('name, country, gcal_calendar_id')
       .eq('booking_id', appt.booking_id)
       .single();
 
-    // Fetch assigned commercial if present
     let assignedUser = '';
     let assignedCalendarId = bc?.gcal_calendar_id || '';
     let commercialId = '';
@@ -188,54 +287,34 @@ Deno.serve(async (req) => {
       }
     }
 
-    const fd: Record<string, string> = appt.form_data ?? {};
     const countryCode: string = bc?.country ?? 'CO';
     const countryTab = COUNTRY_NAMES[countryCode] ?? countryCode;
+    const row = buildRow(appt, bc, assignedUser, assignedCalendarId, commercialId, countryTab);
 
-    const row = [
-      appt.booking_id ?? '',
-      bc?.name ?? '',
-      countryTab,
-      appt.appointment_date ?? '',
-      appt.start_time ?? '',
-      appt.timezone ?? '',
-      String(appt.duration_minutes ?? ''),
-      appt.lead_name ?? '',
-      appt.lead_email ?? '',
-      fd.whatsapp ?? '',
-      fd.tipo_cliente ?? '',
-      fd.perfil_resumen ?? '',
-      appt.lead_company ?? fd.empresa ?? '',
-      fd.ya_vende ?? '',
-      fd.tipo_pago ?? '',
-      fd.tiene_web ?? '',
-      fd.usa_chatbot ?? '',
-      fd.envios_mes ?? '',
-      fd.tipo_comerciante ?? '',
-      appt.lead_notes ?? fd.notes ?? '',
-      assignedUser,
-      assignedCalendarId,
-      commercialId,
-      appt.gcal_event_id ?? '',
-      appt.gcal_html_link ?? '',
-      appt.status ?? '',
-      appt.created_at ?? '',
-    ];
-
-    // Authenticate
     const saKey = JSON.parse(Deno.env.get('GOOGLE_SERVICE_ACCOUNT_KEY')!);
     const token = await getGoogleAccessToken(saKey);
     const sheetId = Deno.env.get('GOOGLE_SHEETS_ID')!;
 
-    // Ensure tab exists (creates it with headers if not)
     const existingTabs = await getSheetTabs(token, sheetId);
     if (!existingTabs.includes(countryTab)) {
       await createTab(token, sheetId, countryTab);
     }
 
-    await appendRows(token, sheetId, countryTab, [row]);
+    if (eventType === 'UPDATE') {
+      const rowNumber = await findRowById(token, sheetId, countryTab, appt.id);
+      if (rowNumber) {
+        await updateRow(token, sheetId, countryTab, rowNumber, row);
+        console.log(`✓ UPDATE appointment ${appt.id} → row ${rowNumber} en "${countryTab}"`);
+      } else {
+        // Row not found (legacy row without id column) — append
+        await appendRows(token, sheetId, countryTab, [row]);
+        console.log(`✓ UPDATE→append appointment ${appt.id} (row no encontrada) en "${countryTab}"`);
+      }
+    } else {
+      await appendRows(token, sheetId, countryTab, [row]);
+      console.log(`✓ INSERT appointment ${appt.id} → tab "${countryTab}"`);
+    }
 
-    console.log(`✓ appointment ${appt.id} → tab "${countryTab}"`);
     return new Response(JSON.stringify({ ok: true }), {
       headers: { 'Content-Type': 'application/json' },
     });
