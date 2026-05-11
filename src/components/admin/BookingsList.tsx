@@ -16,7 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ExternalLink, Copy, Check, MoreVertical, Pencil, Trash2, Clock, MapPin } from 'lucide-react';
+import { ExternalLink, Copy, Check, MoreVertical, Pencil, Trash2, Clock, MapPin, BarChart2 } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -137,6 +137,15 @@ export function BookingsList({ bookings, onEdit, onDelete, onToggleStatus }: Boo
                     title="Abrir link"
                   >
                     <ExternalLink className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => navigate(`/admin/crm/${booking.booking_id}`)}
+                    className="h-8 w-8"
+                    title="Ver CRM"
+                  >
+                    <BarChart2 className="w-4 h-4" />
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

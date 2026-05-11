@@ -9,6 +9,7 @@ import BookingPage from "./pages/BookingPage";
 import ConfirmationPage from "./pages/ConfirmationPage";
 import AdminPage from "./pages/AdminPage";
 import AuthPage from "./pages/AuthPage";
+import CRMPage from "./pages/CRMPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/agenda/:bookingId" element={<BookingPage />} />
             <Route path="/confirmacion" element={<ConfirmationPage />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin/crm/:bookingId" element={<CRMPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
