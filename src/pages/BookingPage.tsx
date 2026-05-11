@@ -310,6 +310,7 @@ export default function BookingPage() {
             bookingDetails: { ...bookingDetails, gcal_link: result.data?.gcal_link },
           },
         });
+      }
     } catch (error) {
       console.error('Error submitting booking:', error);
       navigate('/confirmacion', {
