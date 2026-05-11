@@ -548,12 +548,16 @@ Deno.serve(async (req) => {
     // -----------------------------------------------------------------------
     const { data: existingAppointments } = await supabase
       .from('appointments')
-      .select('start_time, end_time')
+      .select('start_time, end_time, assigned_commercial_id')
       .eq('booking_id', booking_id)
       .eq('appointment_date', fecha)
       .in('status', ['pending', 'confirmed'])
 
-    const dbAppointments = (existingAppointments ?? []) as Array<{ start_time: string; end_time: string }>
+    const dbAppointments = (existingAppointments ?? []) as Array<{
+      start_time: string
+      end_time: string
+      assigned_commercial_id: string | null
+    }>
 
     // -----------------------------------------------------------------------
     // 8. Generar slots con disponibilidad
@@ -564,34 +568,34 @@ Deno.serve(async (req) => {
     for (const slot of baseSlots) {
       // Filtro de anticipación mínima para hoy
       if (!passesLeadTimeFilter(fecha, slot.time)) {
-        // No incluimos slots pasados del día de hoy
         continue
       }
-
-      // Bloqueado por DB
-      const blockedByDB = dbAppointments.some(
-        (appt) => slot.time < appt.end_time && slot.endTime > appt.start_time
-      )
 
       let available: boolean
 
       if (assignmentType === 'group' && groupMembers.length > 0) {
-        // Un slot está disponible si AL MENOS UN miembro está libre en Google
-        // (y no está bloqueado en DB global del booking)
-        if (blockedByDB) {
-          available = false
-        } else if (!accessToken || busyByCal.size === 0) {
-          // Sin token: asumir disponible (degradación graceful)
-          available = true
-        } else {
-          // Verificar si al menos un miembro está libre
-          available = groupMembers.some((member) => {
-            const memberBusy = busyByCal.get(member.calendar_id) ?? []
-            return !isSlotBusy(memberBusy, fecha, slot.time, slot.endTime)
-          })
-        }
+        // Un slot está disponible si AL MENOS UN miembro del grupo está libre
+        // tanto en Google Calendar como en la DB (verificación por agente individual)
+        available = groupMembers.some((member) => {
+          // ¿Este agente específico ya tiene un appointment en este slot?
+          const memberBusyInDB = dbAppointments.some(
+            (appt) =>
+              appt.assigned_commercial_id === member.id &&
+              slot.time < appt.end_time &&
+              slot.endTime > appt.start_time
+          )
+          if (memberBusyInDB) return false
+
+          // ¿Está ocupado en Google Calendar?
+          if (!accessToken) return true // sin token: asumir libre (degradación graceful)
+          const memberBusy = busyByCal.get(member.calendar_id) ?? []
+          return !isSlotBusy(memberBusy, fecha, slot.time, slot.endTime)
+        })
       } else {
-        // Individual
+        // Individual: bloquear si tiene appointment en DB o en Google Calendar
+        const blockedByDB = dbAppointments.some(
+          (appt) => slot.time < appt.end_time && slot.endTime > appt.start_time
+        )
         const blockedByGoogle = accessToken
           ? isSlotBusy(busySingle, fecha, slot.time, slot.endTime)
           : false
