@@ -289,7 +289,7 @@ export default function BookingPage() {
             booking_id: booking.booking_id,
             fecha,
             hora: selectedTime,
-            form_data: formData,
+            form_data: formDataWithLabels,
             name: formData.name,
             email: formData.email,
             company: formData.company,
@@ -307,7 +307,12 @@ export default function BookingPage() {
         navigate('/confirmacion', {
           state: {
             webhookResponse: result.data,
-            bookingDetails: { ...bookingDetails, gcal_link: result.data?.gcal_link },
+            bookingDetails: {
+              ...bookingDetails,
+              gcal_link: result.data?.gcal_link,
+              commercial_name: result.data?.assigned_commercial?.name,
+              meeting_link: result.data?.assigned_commercial?.meeting_link,
+            },
           },
         });
       }

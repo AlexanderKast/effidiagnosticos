@@ -1,4 +1,4 @@
-import { CheckCircle2, Calendar, Clock, User, Building2, Home, CalendarPlus } from 'lucide-react';
+import { CheckCircle2, Calendar, Clock, User, Building2, Home, CalendarPlus, Video, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate, useLocation } from 'react-router-dom';
 import grupoEffiLogo from '@/assets/grupo-effi-logo.jpg';
@@ -9,6 +9,8 @@ interface BookingDetails {
   duration?: number;
   bookingName?: string;
   gcal_link?: string;
+  commercial_name?: string;
+  meeting_link?: string;
   [key: string]: string | number | undefined;
 }
 
@@ -26,7 +28,7 @@ export default function ConfirmationPage() {
   const bookingDetails = state?.bookingDetails;
 
   // Extract known fields for display
-  const { date, time, duration, bookingName, gcal_link, ...otherDetails } = bookingDetails || {};
+  const { date, time, duration, bookingName, gcal_link, commercial_name, meeting_link, ...otherDetails } = bookingDetails || {};
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -110,6 +112,34 @@ export default function ConfirmationPage() {
               </div>
             )}
 
+            {/* Comercial asignado + Link de reunión */}
+            {(commercial_name || meeting_link) && (
+              <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 mb-4 text-left space-y-3">
+                {commercial_name && (
+                  <div className="flex items-center gap-3">
+                    <UserCheck className="w-4 h-4 text-primary shrink-0" />
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Tu asesor asignado: </span>
+                      <span className="font-semibold text-foreground">{commercial_name}</span>
+                    </div>
+                  </div>
+                )}
+                {meeting_link && (
+                  <div className="flex items-center gap-3">
+                    <Video className="w-4 h-4 text-primary shrink-0" />
+                    <a
+                      href={String(meeting_link)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-primary font-medium underline underline-offset-2 break-all"
+                    >
+                      {String(meeting_link)}
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Info Box */}
             <div className="bg-accent rounded-xl p-4 mb-6">
               <p className="text-sm text-accent-foreground">
@@ -118,24 +148,36 @@ export default function ConfirmationPage() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              {gcal_link && (
+            <div className="flex flex-col gap-3">
+              {meeting_link && (
                 <Button
-                  onClick={() => window.open(String(gcal_link), '_blank')}
-                  className="flex-1 min-h-[44px]"
+                  onClick={() => window.open(String(meeting_link), '_blank')}
+                  className="w-full min-h-[44px]"
                 >
-                  <CalendarPlus className="w-4 h-4 mr-2" />
-                  Ver en Google Calendar
+                  <Video className="w-4 h-4 mr-2" />
+                  Unirse a la reunión
                 </Button>
               )}
-              <Button
-                variant="outline"
-                onClick={() => navigate('/')}
-                className="flex-1 min-h-[44px]"
-              >
-                <Home className="w-4 h-4 mr-2" />
-                Volver al inicio
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-3">
+                {gcal_link && (
+                  <Button
+                    variant="outline"
+                    onClick={() => window.open(String(gcal_link), '_blank')}
+                    className="flex-1 min-h-[44px]"
+                  >
+                    <CalendarPlus className="w-4 h-4 mr-2" />
+                    Ver en Google Calendar
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/')}
+                  className="flex-1 min-h-[44px]"
+                >
+                  <Home className="w-4 h-4 mr-2" />
+                  Volver al inicio
+                </Button>
+              </div>
             </div>
           </div>
 

@@ -26,6 +26,7 @@ interface CommercialMember {
   calendar_id: string  // ID del calendario de Google (email generalmente)
   name: string
   email: string
+  meeting_link: string | null
 }
 
 interface GCalEvent {
@@ -260,6 +261,7 @@ async function createGoogleCalendarEvent(params: {
   calendarId: string
   title: string
   description: string
+  location?: string
   fecha: string
   hora: string
   endTime: string
@@ -269,9 +271,10 @@ async function createGoogleCalendarEvent(params: {
   const startDatetime = `${params.fecha}T${params.hora}:00-05:00`
   const endDatetime = `${params.fecha}T${params.endTime}:00-05:00`
 
-  const event = {
+  const event: Record<string, unknown> = {
     summary: params.title,
     description: params.description,
+    ...(params.location ? { location: params.location } : {}),
     start: { dateTime: startDatetime, timeZone: 'America/Bogota' },
     end: { dateTime: endDatetime, timeZone: 'America/Bogota' },
     attendees: [{ email: params.attendeeEmail, displayName: params.attendeeName }],
@@ -425,7 +428,8 @@ Deno.serve(async (req) => {
             calendar_id,
             name,
             email,
-            status
+            status,
+            meeting_link
           )
         `)
         .eq('group_id', config.commercial_group_id)
@@ -445,6 +449,7 @@ Deno.serve(async (req) => {
           calendar_id: cal.calendar_id as string,
           name: cal.name as string,
           email: cal.email as string,
+          meeting_link: (cal.meeting_link as string | null) ?? null,
         }
       })
 
@@ -461,7 +466,7 @@ Deno.serve(async (req) => {
 
       const { data: commercial, error: commercialError } = await supabase
         .from('commercial_calendars')
-        .select('id, calendar_id, name, email')
+        .select('id, calendar_id, name, email, meeting_link')
         .eq('calendar_id', gcalCalendarId)
         .eq('status', 'active')
         .single()
@@ -472,6 +477,7 @@ Deno.serve(async (req) => {
           calendar_id: commercial.calendar_id,
           name: commercial.name,
           email: commercial.email,
+          meeting_link: commercial.meeting_link ?? null,
         }
       }
       // Si no se encuentra comercial en commercial_calendars, se continúa sin assigned_commercial_id
@@ -581,6 +587,8 @@ Deno.serve(async (req) => {
         calendarId: gcalCalendarId,
         leadName,
         leadEmail,
+        formData: form_data,
+        meetingLink: assignedCommercial?.meeting_link ?? null,
         fecha,
         hora,
         endTime,
@@ -603,7 +611,12 @@ Deno.serve(async (req) => {
             lead_name: leadName,
             lead_email: leadEmail,
             assigned_commercial: assignedCommercial
-              ? { id: assignedCommercial.id, name: assignedCommercial.name, email: assignedCommercial.email }
+              ? {
+                  id: assignedCommercial.id,
+                  name: assignedCommercial.name,
+                  email: assignedCommercial.email,
+                  meeting_link: assignedCommercial.meeting_link,
+                }
               : null,
             gcal_link: gcalResult?.htmlLink ?? null,
             gcal_synced: !!gcalResult,
@@ -652,6 +665,8 @@ async function syncToGoogleCalendar(params: {
   calendarId: string
   leadName: string
   leadEmail: string
+  formData: Record<string, unknown>
+  meetingLink: string | null
   fecha: string
   hora: string
   endTime: string
@@ -667,20 +682,27 @@ async function syncToGoogleCalendar(params: {
   }
 
   try {
-    const description = [
-      `Reunión agendada desde ${APP_URL}`,
-      params.config.subtitle ? `\n${params.config.subtitle}` : '',
-      `\nContacto: ${params.leadName} <${params.leadEmail}>`,
-      params.config.duration ? `\nDuración: ${params.config.duration} minutos` : '',
-    ]
-      .filter(Boolean)
-      .join('')
+    // Descripción formateada con los campos del formulario
+    const descLines: string[] = []
+    Object.entries(params.formData).forEach(([label, value]) => {
+      if (value !== undefined && String(value).trim()) {
+        descLines.push(`${label}: ${String(value)}`)
+      }
+    })
+    descLines.push('')
+    descLines.push(`Duración: ${params.config.duration ?? 30} minutos`)
+    descLines.push('Zona horaria: Colombia (UTC-5)')
+    if (params.meetingLink) {
+      descLines.push(`Link de reunión: ${params.meetingLink}`)
+    }
+    const description = descLines.join('\n')
 
     const gcalEvent = await createGoogleCalendarEvent({
       accessToken: params.accessToken,
       calendarId: params.calendarId,
       title: `${params.config.name ?? params.config.title} — ${params.leadName}`,
       description,
+      location: params.meetingLink ?? undefined,
       fecha: params.fecha,
       hora: params.hora,
       endTime: params.endTime,
