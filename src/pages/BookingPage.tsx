@@ -128,43 +128,53 @@ export default function BookingPage() {
   const fetchAvailability = async (date: Date) => {
     if (!booking) return;
 
-    // Reset state before fetching
     setSelectedTime(null);
     setAvailableSlots([]);
     setIsLoadingSlots(true);
 
+    const fecha = format(date, 'yyyy-MM-dd');
+
     try {
-      if (booking.n8n_get_availability_url) {
-        console.log('Fetching availability from:', booking.n8n_get_availability_url);
-        console.log('Request body:', { booking_id: booking.booking_id, date: format(date, 'yyyy-MM-dd') });
-        
+      // Route: Edge Function (new) vs N8N (legacy)
+      if (booking.use_supabase_backend) {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        const response = await fetch(`${supabaseUrl}/functions/v1/validate-availability`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${anonKey}`,
+          },
+          body: JSON.stringify({ booking_id: booking.booking_id, fecha }),
+        });
+
+        if (response.ok) {
+          const { data } = await response.json();
+          const available = (data.slots as Array<{ time: string; available: boolean }>)
+            .filter(s => s.available)
+            .map(s => s.time);
+          setAvailableSlots(available);
+          return;
+        }
+      } else if (booking.n8n_get_availability_url) {
         const response = await fetch(booking.n8n_get_availability_url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            booking_id: booking.booking_id,
-            date: format(date, 'yyyy-MM-dd'),
-          }),
+          body: JSON.stringify({ booking_id: booking.booking_id, date: fecha }),
         });
 
-        console.log('Response status:', response.status);
-        
         if (response.ok) {
           const data = await response.json();
-          console.log('Response data:', data);
-          // Support both "slots" and "available_slots" from n8n response
           const slots = data.slots || data.available_slots || [];
           setAvailableSlots(slots);
-          setIsLoadingSlots(false);
           return;
         }
       }
-      // Demo fallback if no URL configured
-      console.log('No n8n URL configured or request failed, using demo slots');
+
+      // Demo fallback
       setAvailableSlots(['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
     } catch (error) {
       console.error('Error fetching availability:', error);
-      // Demo fallback on error
       setAvailableSlots(['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
     } finally {
       setIsLoadingSlots(false);
@@ -269,68 +279,84 @@ export default function BookingPage() {
         }
       });
 
-      if (booking.n8n_create_booking_url) {
+      const fecha = format(selectedDate, 'yyyy-MM-dd');
+      const fechaDisplay = format(selectedDate, 'dd/MM/yyyy');
+      const bookingDetails = {
+        date: fechaDisplay,
+        time: selectedTime,
+        duration: booking.duration,
+        bookingName: booking.name,
+        ...formDataWithLabels,
+      };
+
+      if (booking.use_supabase_backend) {
+        // Edge Function path (nuevo backend sin N8N)
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        const response = await fetch(`${supabaseUrl}/functions/v1/create-booking`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${anonKey}`,
+          },
+          body: JSON.stringify({
+            booking_id: booking.booking_id,
+            fecha,
+            hora: selectedTime,
+            form_data: formData,
+            name: formData.name,
+            email: formData.email,
+            company: formData.company,
+            notes: formData.notes,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error ?? 'Error al crear la cita');
+        }
+
+        trackEvent('booking_complete', { date: fecha, time: selectedTime, booking_name: booking.name });
+        navigate('/confirmacion', {
+          state: {
+            webhookResponse: result.data,
+            bookingDetails: { ...bookingDetails, gcal_link: result.data?.gcal_link },
+          },
+        });
+      } else if (booking.n8n_create_booking_url) {
+        // N8N path (legacy)
         const response = await fetch(booking.n8n_create_booking_url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             booking_id: booking.booking_id,
             ...formDataWithLabels,
-            date: format(selectedDate, 'yyyy-MM-dd'),
+            date: fecha,
             time: selectedTime,
           }),
         });
-        
+
         let webhookData = null;
-        try {
-          webhookData = await response.json();
-        } catch {
-          // Response might not be JSON
-        }
-        
-        // Track booking complete
-        trackEvent('booking_complete', { 
-          date: format(selectedDate, 'yyyy-MM-dd'), 
-          time: selectedTime,
-          booking_name: booking.name
-        });
-        
-        navigate('/confirmacion', { 
-          state: { 
-            webhookResponse: webhookData,
-            bookingDetails: {
-              date: format(selectedDate, 'dd/MM/yyyy'),
-              time: selectedTime,
-              duration: booking.duration,
-              bookingName: booking.name,
-              ...formDataWithLabels
-            }
-          } 
-        });
+        try { webhookData = await response.json(); } catch { /* non-JSON */ }
+
+        trackEvent('booking_complete', { date: fecha, time: selectedTime, booking_name: booking.name });
+        navigate('/confirmacion', { state: { webhookResponse: webhookData, bookingDetails } });
       } else {
-        navigate('/confirmacion', { 
-          state: { 
-            bookingDetails: {
-              date: format(selectedDate, 'dd/MM/yyyy'),
-              time: selectedTime,
-              duration: booking.duration,
-              bookingName: booking.name,
-              ...formDataWithLabels
-            }
-          } 
-        });
+        trackEvent('booking_complete', { date: fecha, time: selectedTime, booking_name: booking.name });
+        navigate('/confirmacion', { state: { bookingDetails } });
       }
     } catch (error) {
-      console.log('Demo mode: navigating to confirmation');
-      navigate('/confirmacion', { 
-        state: { 
+      console.error('Error submitting booking:', error);
+      navigate('/confirmacion', {
+        state: {
           bookingDetails: {
-            date: format(selectedDate, 'dd/MM/yyyy'),
+            date: selectedDate ? format(selectedDate, 'dd/MM/yyyy') : '',
             time: selectedTime,
             duration: booking?.duration,
             bookingName: booking?.name,
-          }
-        } 
+          },
+        },
       });
     } finally {
       setIsSubmitting(false);

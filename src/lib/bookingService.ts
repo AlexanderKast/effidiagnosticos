@@ -20,6 +20,7 @@ const dbToBookingConfig = (row: any): BookingConfig => ({
   trackingPixels: (row.tracking_pixels as TrackingPixel[]) || [],
   n8n_get_availability_url: row.n8n_get_availability_url || '',
   n8n_create_booking_url: row.n8n_create_booking_url || '',
+  use_supabase_backend: row.use_supabase_backend ?? false,
   active: row.active ?? true,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -134,6 +135,7 @@ export const updateBookingConfig = async (bookingId: string, updates: Partial<Bo
   if (updates.trackingPixels !== undefined) updateData.tracking_pixels = updates.trackingPixels;
   if (updates.n8n_get_availability_url !== undefined) updateData.n8n_get_availability_url = updates.n8n_get_availability_url;
   if (updates.n8n_create_booking_url !== undefined) updateData.n8n_create_booking_url = updates.n8n_create_booking_url;
+  if (updates.use_supabase_backend !== undefined) updateData.use_supabase_backend = updates.use_supabase_backend;
   if (updates.active !== undefined) updateData.active = updates.active;
 
   const { data, error } = await supabase

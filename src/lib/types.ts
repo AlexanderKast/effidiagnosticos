@@ -132,6 +132,7 @@ export interface BookingConfig {
   // Technical config (per booking)
   n8n_get_availability_url: string;
   n8n_create_booking_url: string;
+  use_supabase_backend: boolean;
 
   // Status
   active: boolean;
@@ -201,6 +202,7 @@ export const createDefaultBooking = (partial?: Partial<BookingConfig>): BookingC
   trackingPixels: [],
   n8n_get_availability_url: '',
   n8n_create_booking_url: '',
+  use_supabase_backend: false,
   active: true,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
