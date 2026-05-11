@@ -44,23 +44,58 @@ function addMinutes(time: string, minutes: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Google OAuth token
+// Google OAuth token — lee y refresca directamente desde oauth_tokens
 // ---------------------------------------------------------------------------
+
+const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID')!
+const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET')!
 
 async function getGoogleAccessToken(): Promise<string | null> {
   try {
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/google-token-refresh`, {
+    const { data: tokenRow, error } = await supabase
+      .from('oauth_tokens')
+      .select('access_token, refresh_token, expires_at')
+      .eq('account_key', 'default')
+      .single()
+
+    if (error || !tokenRow) return null
+
+    // Token aún válido (margen 5 min)
+    if (tokenRow.expires_at) {
+      const expiresAt = new Date(tokenRow.expires_at).getTime()
+      if (expiresAt > Date.now() + 5 * 60 * 1000) {
+        return tokenRow.access_token
+      }
+    }
+
+    // Refrescar token
+    const refreshResp = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ account_key: 'default' }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        refresh_token: tokenRow.refresh_token,
+        grant_type: 'refresh_token',
+      }),
     })
-    if (!resp.ok) return null
-    const { access_token } = await resp.json()
-    return access_token ?? null
-  } catch {
+
+    if (!refreshResp.ok) {
+      console.error('[create-booking] Token refresh failed:', await refreshResp.text())
+      return null
+    }
+
+    const tokens = await refreshResp.json()
+    const newExpiresAt = new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString()
+
+    await supabase
+      .from('oauth_tokens')
+      .update({ access_token: tokens.access_token, expires_at: newExpiresAt, updated_at: new Date().toISOString() })
+      .eq('account_key', 'default')
+
+    return tokens.access_token
+  } catch (err) {
+    console.error('[create-booking] getGoogleAccessToken error:', err)
     return null
   }
 }
@@ -289,7 +324,8 @@ Deno.serve(async (req) => {
   }
 
   const requestId = crypto.randomUUID()
-  const ip = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? null
+  const rawIp = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? null
+  const ip = rawIp ? rawIp.split(',')[0].trim() : null
   const userAgent = req.headers.get('user-agent') ?? null
 
   try {
@@ -594,7 +630,11 @@ Deno.serve(async (req) => {
     }
 
     return Response.json(
-      { success: false, error: 'Error al crear la cita. Intenta de nuevo.', request_id: requestId },
+      {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+        request_id: requestId,
+      },
       { status: 500, headers: CORS_HEADERS }
     )
   }

@@ -8,6 +8,7 @@ interface BookingDetails {
   time?: string;
   duration?: number;
   bookingName?: string;
+  gcal_link?: string;
   [key: string]: string | number | undefined;
 }
 
@@ -25,7 +26,7 @@ export default function ConfirmationPage() {
   const bookingDetails = state?.bookingDetails;
 
   // Extract known fields for display
-  const { date, time, duration, bookingName, ...otherDetails } = bookingDetails || {};
+  const { date, time, duration, bookingName, gcal_link, ...otherDetails } = bookingDetails || {};
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -118,6 +119,15 @@ export default function ConfirmationPage() {
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3">
+              {gcal_link && (
+                <Button
+                  onClick={() => window.open(String(gcal_link), '_blank')}
+                  className="flex-1 min-h-[44px]"
+                >
+                  <CalendarPlus className="w-4 h-4 mr-2" />
+                  Ver en Google Calendar
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() => navigate('/')}
