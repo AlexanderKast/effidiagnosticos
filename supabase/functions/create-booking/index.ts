@@ -265,16 +265,25 @@ async function createGoogleCalendarEvent(params: {
   endTime: string
   attendeeEmail: string
   attendeeName: string
+  commercialEmail?: string
+  commercialName?: string
 }): Promise<GCalEvent> {
   const startDatetime = `${params.fecha}T${params.hora}:00-05:00`
   const endDatetime = `${params.fecha}T${params.endTime}:00-05:00`
+
+  const attendees: Array<{ email: string; displayName?: string }> = [
+    { email: params.attendeeEmail, displayName: params.attendeeName },
+  ]
+  if (params.commercialEmail) {
+    attendees.push({ email: params.commercialEmail, displayName: params.commercialName })
+  }
 
   const event = {
     summary: params.title,
     description: params.description,
     start: { dateTime: startDatetime, timeZone: 'America/Bogota' },
     end: { dateTime: endDatetime, timeZone: 'America/Bogota' },
-    attendees: [{ email: params.attendeeEmail, displayName: params.attendeeName }],
+    attendees,
     reminders: {
       useDefault: false,
       overrides: [
@@ -569,16 +578,18 @@ Deno.serve(async (req) => {
       })
 
       // -----------------------------------------------------------------------
-      // 7. Sincronizar con Google Calendar del comercial seleccionado
+      // 7. Sincronizar con Google Calendar
+      // El evento se crea en el calendario master (estrategaeffi@gmail.com)
+      // y el comercial asignado queda como invitado (recibe la cita en su calendario)
       // -----------------------------------------------------------------------
-      const gcalCalendarId = assignedCommercial?.calendar_id ?? (config.gcal_calendar_id as string) ?? 'primary'
-
       const gcalResult = await syncToGoogleCalendar({
         appointmentId: appointment.id,
         config,
-        calendarId: gcalCalendarId,
+        calendarId: 'estrategaeffi@gmail.com',
         leadName,
         leadEmail,
+        commercialName: assignedCommercial?.name,
+        commercialEmail: assignedCommercial?.email,
         fecha,
         hora,
         endTime,
@@ -650,6 +661,8 @@ async function syncToGoogleCalendar(params: {
   calendarId: string
   leadName: string
   leadEmail: string
+  commercialName?: string
+  commercialEmail?: string
   fecha: string
   hora: string
   endTime: string
@@ -684,6 +697,8 @@ async function syncToGoogleCalendar(params: {
       endTime: params.endTime,
       attendeeEmail: params.leadEmail,
       attendeeName: params.leadName,
+      commercialEmail: params.commercialEmail,
+      commercialName: params.commercialName,
     })
 
     await supabase
