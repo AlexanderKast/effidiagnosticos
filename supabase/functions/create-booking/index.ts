@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { z } from 'https://esm.sh/zod@3'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -13,17 +12,40 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 }
 
-const BookingRequestSchema = z.object({
-  booking_id: z.string().min(1),
-  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  hora: z.string().regex(/^\d{2}:\d{2}$/),
-  form_data: z.record(z.unknown()).default({}),
-  // Extracted from form_data for convenience
-  name: z.string().min(1).optional(),
-  email: z.string().email().optional(),
-  company: z.string().optional(),
-  notes: z.string().optional(),
-})
+// ---------------------------------------------------------------------------
+// Tipos
+// ---------------------------------------------------------------------------
+
+interface BusyPeriod {
+  start: string
+  end: string
+}
+
+interface CommercialMember {
+  id: string           // UUID en commercial_calendars
+  calendar_id: string  // ID del calendario de Google (email generalmente)
+  name: string
+  email: string
+}
+
+interface GCalEvent {
+  id: string
+  htmlLink: string
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function addMinutes(time: string, minutes: number): string {
+  const [h, m] = time.split(':').map(Number)
+  const total = h * 60 + m + minutes
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
+// ---------------------------------------------------------------------------
+// Google OAuth token
+// ---------------------------------------------------------------------------
 
 async function getGoogleAccessToken(): Promise<string | null> {
   try {
@@ -37,32 +59,186 @@ async function getGoogleAccessToken(): Promise<string | null> {
     })
     if (!resp.ok) return null
     const { access_token } = await resp.json()
-    return access_token
+    return access_token ?? null
   } catch {
     return null
   }
 }
 
+// ---------------------------------------------------------------------------
+// Google Calendar freeBusy — verificar si UN slot exacto está libre para un comercial
+// ---------------------------------------------------------------------------
+
+async function isCalendarFree(
+  accessToken: string,
+  calendarId: string,
+  fecha: string,
+  hora: string,
+  endTime: string
+): Promise<boolean> {
+  const timeMin = `${fecha}T${hora}:00-05:00`
+  const timeMax = `${fecha}T${endTime}:00-05:00`
+
+  try {
+    const resp = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        timeMin,
+        timeMax,
+        timeZone: 'America/Bogota',
+        items: [{ id: calendarId }],
+      }),
+    })
+
+    if (!resp.ok) {
+      console.error('[create-booking] freeBusy check failed:', resp.status)
+      return true // Asumir libre ante error (no bloquear)
+    }
+
+    const data = await resp.json()
+    const busy: BusyPeriod[] = data.calendars?.[calendarId]?.busy ?? []
+    return busy.length === 0
+  } catch (err) {
+    console.error('[create-booking] freeBusy check error:', err)
+    return true // Degradación graceful
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Google Calendar freeBusy — múltiples calendarios para el slot exacto
+// Retorna Map<calendarId, isFree>
+// ---------------------------------------------------------------------------
+
+async function checkMultipleCalendarsFree(
+  accessToken: string,
+  members: CommercialMember[],
+  fecha: string,
+  hora: string,
+  endTime: string
+): Promise<Map<string, boolean>> {
+  const timeMin = `${fecha}T${hora}:00-05:00`
+  const timeMax = `${fecha}T${endTime}:00-05:00`
+  const result = new Map<string, boolean>()
+
+  if (members.length === 0) return result
+
+  try {
+    const resp = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        timeMin,
+        timeMax,
+        timeZone: 'America/Bogota',
+        items: members.map((m) => ({ id: m.calendar_id })),
+      }),
+    })
+
+    if (!resp.ok) {
+      console.error('[create-booking] freeBusy multiple failed:', resp.status)
+      // Asumir todos libres ante error
+      members.forEach((m) => result.set(m.calendar_id, true))
+      return result
+    }
+
+    const data = await resp.json()
+    members.forEach((m) => {
+      const busy: BusyPeriod[] = data.calendars?.[m.calendar_id]?.busy ?? []
+      result.set(m.calendar_id, busy.length === 0)
+    })
+    return result
+  } catch (err) {
+    console.error('[create-booking] freeBusy multiple error:', err)
+    members.forEach((m) => result.set(m.calendar_id, true))
+    return result
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Contar appointments de HOY en DB para un comercial dado (round-robin)
+// ---------------------------------------------------------------------------
+
+async function countAppointmentsToday(commercialId: string, fecha: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('appointments')
+    .select('id', { count: 'exact', head: true })
+    .eq('assigned_commercial_id', commercialId)
+    .eq('appointment_date', fecha)
+    .in('status', ['pending', 'confirmed'])
+
+  if (error) {
+    console.error('[create-booking] countAppointmentsToday error:', error)
+    return 0
+  }
+  return count ?? 0
+}
+
+// ---------------------------------------------------------------------------
+// Seleccionar comercial para grupo (round-robin por menor carga del día)
+// ---------------------------------------------------------------------------
+
+async function selectCommercialFromGroup(
+  members: CommercialMember[],
+  accessToken: string | null,
+  fecha: string,
+  hora: string,
+  endTime: string
+): Promise<CommercialMember> {
+  // Paso 1: Si hay token, verificar cuáles están libres en Google Calendar
+  let freeMembers: CommercialMember[] = []
+
+  if (accessToken && members.length > 0) {
+    const freedomMap = await checkMultipleCalendarsFree(accessToken, members, fecha, hora, endTime)
+    freeMembers = members.filter((m) => freedomMap.get(m.calendar_id) !== false)
+  }
+
+  // Si ninguno está libre en Google (o no hay token), usar todos para round-robin
+  const candidatePool = freeMembers.length > 0 ? freeMembers : members
+
+  // Paso 2: Round-robin — elegir el de MENOS appointments hoy en DB
+  const counts = await Promise.all(
+    candidatePool.map(async (m) => ({
+      member: m,
+      count: await countAppointmentsToday(m.id, fecha),
+    }))
+  )
+
+  // Ordenar por menor cantidad de appointments
+  counts.sort((a, b) => a.count - b.count)
+
+  return counts[0].member
+}
+
+// ---------------------------------------------------------------------------
+// Crear evento en Google Calendar del comercial
+// ---------------------------------------------------------------------------
+
 async function createGoogleCalendarEvent(params: {
   accessToken: string
-  calendarId: string   // calendario del comercial (ej: juan@effi.com)
+  calendarId: string
   title: string
   description: string
-  date: string
-  startTime: string
+  fecha: string
+  hora: string
   endTime: string
   attendeeEmail: string
   attendeeName: string
-  timezone: string
-}) {
-  const startDatetime = `${params.date}T${params.startTime}:00`
-  const endDatetime = `${params.date}T${params.endTime}:00`
+}): Promise<GCalEvent> {
+  const startDatetime = `${params.fecha}T${params.hora}:00-05:00`
+  const endDatetime = `${params.fecha}T${params.endTime}:00-05:00`
 
   const event = {
     summary: params.title,
     description: params.description,
-    start: { dateTime: startDatetime, timeZone: params.timezone },
-    end: { dateTime: endDatetime, timeZone: params.timezone },
+    start: { dateTime: startDatetime, timeZone: 'America/Bogota' },
+    end: { dateTime: endDatetime, timeZone: 'America/Bogota' },
     attendees: [{ email: params.attendeeEmail, displayName: params.attendeeName }],
     reminders: {
       useDefault: false,
@@ -96,14 +272,12 @@ async function createGoogleCalendarEvent(params: {
     throw new Error(`Google Calendar event creation failed: ${resp.status} — ${body}`)
   }
 
-  return resp.json() as Promise<{ id: string; htmlLink: string }>
+  return resp.json() as Promise<GCalEvent>
 }
 
-function addMinutes(time: string, minutes: number): string {
-  const [h, m] = time.split(':').map(Number)
-  const total = h * 60 + m + minutes
-  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
-}
+// ---------------------------------------------------------------------------
+// Handler principal
+// ---------------------------------------------------------------------------
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -111,40 +285,76 @@ Deno.serve(async (req) => {
   }
 
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 })
+    return new Response('Method not allowed', { status: 405, headers: CORS_HEADERS })
   }
 
   const requestId = crypto.randomUUID()
-  const ip = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip')
-  const userAgent = req.headers.get('user-agent')
+  const ip = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? null
+  const userAgent = req.headers.get('user-agent') ?? null
 
   try {
-    const body = await req.json()
-    const parsed = BookingRequestSchema.safeParse(body)
-
-    if (!parsed.success) {
+    // -----------------------------------------------------------------------
+    // 1. Parsear y validar input (sin zod)
+    // -----------------------------------------------------------------------
+    let body: Record<string, unknown>
+    try {
+      body = await req.json()
+    } catch {
       return Response.json(
-        { success: false, error: 'Datos inválidos', details: parsed.error.flatten() },
+        { success: false, error: 'JSON inválido' },
         { status: 400, headers: CORS_HEADERS }
       )
     }
 
-    const { booking_id, fecha, hora, form_data } = parsed.data
+    const booking_id = body.booking_id
+    const fecha = body.fecha
+    const hora = body.hora
+    const form_data = (body.form_data ?? {}) as Record<string, unknown>
 
-    // Extract name/email from form_data if not at top level
-    const leadName: string = (parsed.data.name ?? form_data.name ?? '') as string
-    const leadEmail: string = (parsed.data.email ?? form_data.email ?? '') as string
-    const leadCompany: string = (parsed.data.company ?? form_data.company ?? '') as string
-    const leadNotes: string = (parsed.data.notes ?? form_data.notes ?? '') as string
-
-    if (!leadName || !leadEmail) {
+    if (typeof booking_id !== 'string' || booking_id.trim() === '') {
       return Response.json(
-        { success: false, error: 'Nombre y email son requeridos' },
+        { success: false, error: 'booking_id es requerido' },
         { status: 400, headers: CORS_HEADERS }
       )
     }
 
-    // Get booking config
+    if (typeof fecha !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      return Response.json(
+        { success: false, error: 'fecha debe tener formato YYYY-MM-DD' },
+        { status: 400, headers: CORS_HEADERS }
+      )
+    }
+
+    if (typeof hora !== 'string' || !/^\d{2}:\d{2}$/.test(hora)) {
+      return Response.json(
+        { success: false, error: 'hora debe tener formato HH:MM' },
+        { status: 400, headers: CORS_HEADERS }
+      )
+    }
+
+    // Extraer nombre/email desde top-level o form_data
+    const leadName: string = String(body.name ?? form_data.name ?? '').trim()
+    const leadEmail: string = String(body.email ?? form_data.email ?? '').trim()
+    const leadCompany: string = String(body.company ?? form_data.company ?? '').trim()
+    const leadNotes: string = String(body.notes ?? form_data.notes ?? '').trim()
+
+    if (!leadName) {
+      return Response.json(
+        { success: false, error: 'El nombre es requerido' },
+        { status: 400, headers: CORS_HEADERS }
+      )
+    }
+
+    if (!leadEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(leadEmail)) {
+      return Response.json(
+        { success: false, error: 'Email inválido o requerido' },
+        { status: 400, headers: CORS_HEADERS }
+      )
+    }
+
+    // -----------------------------------------------------------------------
+    // 2. Obtener configuración del booking
+    // -----------------------------------------------------------------------
     const { data: config, error: configError } = await supabase
       .from('booking_configs')
       .select('*')
@@ -160,8 +370,81 @@ Deno.serve(async (req) => {
     }
 
     const endTime = addMinutes(hora, config.duration)
+    const assignmentType: string = config.assignment_type ?? 'individual'
 
-    // Acquire slot lock (prevents double-booking)
+    // -----------------------------------------------------------------------
+    // 3. Determinar qué comercial se asigna
+    // -----------------------------------------------------------------------
+    let assignedCommercial: CommercialMember | null = null
+    const accessToken = await getGoogleAccessToken()
+
+    if (assignmentType === 'group' && config.commercial_group_id) {
+      // Obtener miembros activos del grupo
+      const { data: members, error: membersError } = await supabase
+        .from('commercial_group_members')
+        .select(`
+          commercial_id,
+          commercial_calendars!inner(
+            id,
+            calendar_id,
+            name,
+            email,
+            status
+          )
+        `)
+        .eq('group_id', config.commercial_group_id)
+        .eq('commercial_calendars.status', 'active')
+
+      if (membersError || !members || members.length === 0) {
+        return Response.json(
+          { success: false, error: 'No hay comerciales disponibles en el grupo' },
+          { status: 503, headers: CORS_HEADERS }
+        )
+      }
+
+      const groupMembers: CommercialMember[] = members.map((m: Record<string, unknown>) => {
+        const cal = m.commercial_calendars as Record<string, unknown>
+        return {
+          id: cal.id as string,
+          calendar_id: cal.calendar_id as string,
+          name: cal.name as string,
+          email: cal.email as string,
+        }
+      })
+
+      assignedCommercial = await selectCommercialFromGroup(
+        groupMembers,
+        accessToken,
+        fecha,
+        hora,
+        endTime
+      )
+    } else {
+      // Individual: buscar el comercial por gcal_calendar_id en commercial_calendars
+      const gcalCalendarId: string = config.gcal_calendar_id ?? 'primary'
+
+      const { data: commercial, error: commercialError } = await supabase
+        .from('commercial_calendars')
+        .select('id, calendar_id, name, email')
+        .eq('calendar_id', gcalCalendarId)
+        .eq('status', 'active')
+        .single()
+
+      if (!commercialError && commercial) {
+        assignedCommercial = {
+          id: commercial.id,
+          calendar_id: commercial.calendar_id,
+          name: commercial.name,
+          email: commercial.email,
+        }
+      }
+      // Si no se encuentra comercial en commercial_calendars, se continúa sin assigned_commercial_id
+      // pero sí con el gcal_calendar_id para el sync de Google Calendar
+    }
+
+    // -----------------------------------------------------------------------
+    // 4. Adquirir lock para prevenir double-booking
+    // -----------------------------------------------------------------------
     const lockId = crypto.randomUUID()
     const { error: lockError } = await supabase.from('availability_locks').insert({
       booking_id,
@@ -171,7 +454,7 @@ Deno.serve(async (req) => {
     })
 
     if (lockError) {
-      // UNIQUE constraint violation = slot already locked
+      // Violación de UNIQUE constraint = slot ya bloqueado
       return Response.json(
         { success: false, error: 'Este horario ya fue reservado. Por favor elige otro.' },
         { status: 409, headers: CORS_HEADERS }
@@ -179,22 +462,30 @@ Deno.serve(async (req) => {
     }
 
     try {
-      // Double-check: no confirmed appointment for this slot
-      const available = await supabase.rpc('is_slot_available', {
+      // -----------------------------------------------------------------------
+      // 5. Verificar disponibilidad en DB con función is_slot_available
+      // -----------------------------------------------------------------------
+      const { data: isAvailable, error: availError } = await supabase.rpc('is_slot_available', {
         p_booking_id: booking_id,
         p_date: fecha,
         p_start_time: hora,
         p_end_time: endTime,
       })
 
-      if (!available.data) {
+      if (availError) {
+        console.error('[create-booking] is_slot_available error:', availError)
+      }
+
+      if (isAvailable === false) {
         return Response.json(
           { success: false, error: 'Este horario ya no está disponible.' },
           { status: 409, headers: CORS_HEADERS }
         )
       }
 
-      // Create appointment in Supabase (source of truth)
+      // -----------------------------------------------------------------------
+      // 6. Insertar appointment en Supabase (fuente de verdad)
+      // -----------------------------------------------------------------------
       const { data: appointment, error: apptError } = await supabase
         .from('appointments')
         .insert({
@@ -214,6 +505,7 @@ Deno.serve(async (req) => {
           source: 'web',
           ip_address: ip,
           user_agent: userAgent,
+          assigned_commercial_id: assignedCommercial?.id ?? null,
         })
         .select()
         .single()
@@ -222,28 +514,45 @@ Deno.serve(async (req) => {
         throw new Error(`Failed to create appointment: ${apptError?.message}`)
       }
 
-      // Log creation
+      // Log de creación
       await supabase.from('audit_log').insert({
         request_id: requestId,
         entity_type: 'appointment',
         entity_id: appointment.id,
         action: 'created',
         actor: 'edge_function:create-booking',
-        metadata: { booking_id, fecha, hora, lead_email: leadEmail },
+        metadata: {
+          booking_id,
+          fecha,
+          hora,
+          lead_email: leadEmail,
+          assignment_type: assignmentType,
+          assigned_commercial_id: assignedCommercial?.id ?? null,
+          assigned_commercial_name: assignedCommercial?.name ?? null,
+        },
       })
 
-      // Try Google Calendar sync (async, non-blocking)
+      // -----------------------------------------------------------------------
+      // 7. Sincronizar con Google Calendar del comercial seleccionado
+      // -----------------------------------------------------------------------
+      const gcalCalendarId = assignedCommercial?.calendar_id ?? (config.gcal_calendar_id as string) ?? 'primary'
+
       const gcalResult = await syncToGoogleCalendar({
         appointmentId: appointment.id,
         config,
+        calendarId: gcalCalendarId,
         leadName,
         leadEmail,
         fecha,
         hora,
         endTime,
         requestId,
+        accessToken,
       })
 
+      // -----------------------------------------------------------------------
+      // 8. Respuesta exitosa
+      // -----------------------------------------------------------------------
       return Response.json(
         {
           success: true,
@@ -255,6 +564,9 @@ Deno.serve(async (req) => {
             end_time: endTime,
             lead_name: leadName,
             lead_email: leadEmail,
+            assigned_commercial: assignedCommercial
+              ? { id: assignedCommercial.id, name: assignedCommercial.name, email: assignedCommercial.email }
+              : null,
             gcal_link: gcalResult?.htmlLink ?? null,
             gcal_synced: !!gcalResult,
           },
@@ -262,19 +574,24 @@ Deno.serve(async (req) => {
         { headers: CORS_HEADERS }
       )
     } finally {
-      // Always release the lock
+      // Siempre liberar el lock
       await supabase.from('availability_locks').delete().eq('locked_by', lockId)
     }
   } catch (err) {
     console.error(`[create-booking][${requestId}]`, err)
 
-    await supabase.from('audit_log').insert({
-      request_id: requestId,
-      entity_type: 'appointment',
-      action: 'error',
-      actor: 'edge_function:create-booking',
-      metadata: { error: err instanceof Error ? err.message : String(err) },
-    })
+    // Intentar registrar el error en audit_log (best-effort)
+    try {
+      await supabase.from('audit_log').insert({
+        request_id: requestId,
+        entity_type: 'appointment',
+        action: 'error',
+        actor: 'edge_function:create-booking',
+        metadata: { error: err instanceof Error ? err.message : String(err) },
+      })
+    } catch {
+      // Ignorar errores del audit_log en el handler de errores
+    }
 
     return Response.json(
       { success: false, error: 'Error al crear la cita. Intenta de nuevo.', request_id: requestId },
@@ -283,18 +600,23 @@ Deno.serve(async (req) => {
   }
 })
 
+// ---------------------------------------------------------------------------
+// Sincronización con Google Calendar
+// ---------------------------------------------------------------------------
+
 async function syncToGoogleCalendar(params: {
   appointmentId: string
   config: Record<string, unknown>
+  calendarId: string
   leadName: string
   leadEmail: string
   fecha: string
   hora: string
   endTime: string
   requestId: string
+  accessToken: string | null
 }): Promise<{ htmlLink: string } | null> {
-  const accessToken = await getGoogleAccessToken()
-  if (!accessToken) {
+  if (!params.accessToken) {
     await supabase
       .from('appointments')
       .update({ gcal_sync_status: 'skipped', gcal_last_error: 'No token available' })
@@ -312,20 +634,16 @@ async function syncToGoogleCalendar(params: {
       .filter(Boolean)
       .join('')
 
-    // Usa el calendario del comercial específico (accedido con tu cuenta principal)
-    const calendarId = (params.config.gcal_calendar_id as string) || 'primary'
-
     const gcalEvent = await createGoogleCalendarEvent({
-      accessToken,
-      calendarId,
+      accessToken: params.accessToken,
+      calendarId: params.calendarId,
       title: `${params.config.name ?? params.config.title} — ${params.leadName}`,
       description,
-      date: params.fecha,
-      startTime: params.hora,
+      fecha: params.fecha,
+      hora: params.hora,
       endTime: params.endTime,
       attendeeEmail: params.leadEmail,
       attendeeName: params.leadName,
-      timezone: 'America/Bogota',
     })
 
     await supabase
@@ -344,13 +662,13 @@ async function syncToGoogleCalendar(params: {
       entity_id: params.appointmentId,
       action: 'gcal_synced',
       actor: 'edge_function:create-booking',
-      metadata: { gcal_event_id: gcalEvent.id },
+      metadata: { gcal_event_id: gcalEvent.id, calendar_id: params.calendarId },
     })
 
     return { htmlLink: gcalEvent.htmlLink }
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err)
-    console.error(`[create-booking] Google Calendar sync failed:`, errMsg)
+    console.error('[create-booking] Google Calendar sync failed:', errMsg)
 
     await supabase
       .from('appointments')

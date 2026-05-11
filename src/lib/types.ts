@@ -129,6 +129,11 @@ export interface BookingConfig {
   // Tracking pixels
   trackingPixels: TrackingPixel[];
 
+  // Assignment
+  assignment_type: 'individual' | 'group';
+  gcal_calendar_id: string;
+  commercial_group_id: string | null;
+
   // Backend config
   use_supabase_backend: boolean;
 
@@ -198,6 +203,9 @@ export const createDefaultBooking = (partial?: Partial<BookingConfig>): BookingC
   requirePolicyAcceptance: true,
   formFields: defaultFormFields,
   trackingPixels: [],
+  assignment_type: 'individual',
+  gcal_calendar_id: 'primary',
+  commercial_group_id: null,
   use_supabase_backend: true,
   active: true,
   createdAt: new Date().toISOString(),

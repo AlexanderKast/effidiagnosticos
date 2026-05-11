@@ -28,6 +28,7 @@ export const COUNTRY_NAMES: Record<string, string> = {
   PY: '🇵🇾 Paraguay',
   UY: '🇺🇾 Uruguay',
   CR: '🇨🇷 Costa Rica',
+  GT: '🇬🇹 Guatemala',
   PA: '🇵🇦 Panamá',
   DO: '🇩🇴 Rep. Dominicana',
 };

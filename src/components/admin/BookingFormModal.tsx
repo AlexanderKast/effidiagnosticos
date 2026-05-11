@@ -8,6 +8,10 @@ import {
   groupByCountry,
   getCountryName,
 } from '@/lib/commercialCalendarsService';
+import {
+  CommercialGroup,
+  fetchGroups,
+} from '@/lib/commercialGroupsService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -61,9 +65,11 @@ export function BookingFormModal({
   const [activeTab, setActiveTab] = useState('identity');
   const [isValidating, setIsValidating] = useState(false);
   const [commercials, setCommercials] = useState<CommercialCalendar[]>([]);
+  const [groups, setGroups] = useState<CommercialGroup[]>([]);
 
   useEffect(() => {
     fetchCommercialCalendars(true).then(setCommercials).catch(() => {});
+    fetchGroups().then(setGroups).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -332,37 +338,102 @@ export function BookingFormModal({
 
           {/* Config Tab */}
           <TabsContent value="config" className="space-y-4 mt-4">
-            {/* Comercial asignado */}
+            {/* Tipo de asignación */}
             <div className="space-y-2">
-              <Label>Comercial asignado</Label>
-              <Select
-                value={(formData as BookingConfig & { gcal_calendar_id?: string }).gcal_calendar_id ?? ''}
-                onValueChange={(calId) => {
-                  updateField('gcal_calendar_id' as keyof BookingConfig, calId as never);
-                  updateField('use_supabase_backend', true);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un comercial..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(groupByCountry(commercials)).sort().map(([country, list]) => (
-                    <SelectGroup key={country}>
-                      <SelectLabel>{getCountryName(country)}</SelectLabel>
-                      {list.map((c) => (
-                        <SelectItem key={c.id} value={c.calendar_id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Las citas de este booking van al calendario del comercial seleccionado.
-                Administra comerciales en la sección "Comerciales" del panel.
-              </p>
+              <Label>Tipo de asignación</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => updateField('assignment_type', 'individual')}
+                  className={`rounded-lg border p-3 text-left transition-colors ${
+                    formData.assignment_type === 'individual'
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-border text-muted-foreground hover:border-primary/50'
+                  }`}
+                >
+                  <p className="text-sm font-medium">Comercial individual</p>
+                  <p className="text-xs mt-0.5 opacity-75">Un agente fijo para este booking</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateField('assignment_type', 'group')}
+                  className={`rounded-lg border p-3 text-left transition-colors ${
+                    formData.assignment_type === 'group'
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-border text-muted-foreground hover:border-primary/50'
+                  }`}
+                >
+                  <p className="text-sm font-medium">Grupo (round-robin)</p>
+                  <p className="text-xs mt-0.5 opacity-75">Rota entre varios comerciales</p>
+                </button>
+              </div>
             </div>
+
+            {/* Selector condicional */}
+            {formData.assignment_type === 'individual' ? (
+              <div className="space-y-2">
+                <Label>Comercial asignado</Label>
+                <Select
+                  value={formData.gcal_calendar_id === 'primary' ? '' : formData.gcal_calendar_id}
+                  onValueChange={(calId) => {
+                    updateField('gcal_calendar_id', calId);
+                    updateField('commercial_group_id', null);
+                    updateField('use_supabase_backend', true);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un comercial..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(groupByCountry(commercials)).sort().map(([country, list]) => (
+                      <SelectGroup key={country}>
+                        <SelectLabel>{getCountryName(country)}</SelectLabel>
+                        {list.map((c) => (
+                          <SelectItem key={c.id} value={c.calendar_id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Las citas siempre van al calendario de este comercial.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Grupo de comerciales</Label>
+                <Select
+                  value={formData.commercial_group_id ?? ''}
+                  onValueChange={(groupId) => {
+                    updateField('commercial_group_id', groupId);
+                    updateField('gcal_calendar_id', 'primary');
+                    updateField('use_supabase_backend', true);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un grupo..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {groups.filter((g) => g.active).map((g) => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.name}
+                        {g.description ? ` — ${g.description}` : ''}
+                      </SelectItem>
+                    ))}
+                    {groups.length === 0 && (
+                      <SelectItem value="__none__" disabled>
+                        No hay grupos. Créalos en la sección Comerciales.
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  El sistema asignará el comercial con menos citas del día (round-robin).
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="policyText">Texto de política de datos</Label>

@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -40,6 +41,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Plus, Pencil, Trash2, Loader2, UserCheck, UserX } from 'lucide-react';
 import { toast } from 'sonner';
+import { CommercialGroupsManager } from './CommercialGroupsManager';
 
 const EMPTY_FORM: CommercialCalendarInput = {
   commercial_id: null,
@@ -50,6 +52,61 @@ const EMPTY_FORM: CommercialCalendarInput = {
   empresa: null,
   country: 'CO',
 };
+
+function CommercialCard({
+  c,
+  onEdit,
+  onToggle,
+  onDelete,
+}: {
+  c: CommercialCalendar;
+  onEdit: (c: CommercialCalendar) => void;
+  onToggle: (c: CommercialCalendar) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm text-foreground truncate">{c.name}</span>
+          {c.status === 'inactive' && (
+            <Badge variant="outline" className="text-xs shrink-0 text-muted-foreground">
+              Inactivo
+            </Badge>
+          )}
+        </div>
+        <span className="text-xs text-muted-foreground truncate block">{c.calendar_id}</span>
+      </div>
+
+      <div className="flex items-center gap-1 shrink-0 ml-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          title={c.status === 'active' ? 'Desactivar' : 'Activar'}
+          onClick={() => onToggle(c)}
+        >
+          {c.status === 'active' ? (
+            <UserCheck className="w-4 h-4 text-green-500" />
+          ) : (
+            <UserX className="w-4 h-4 text-muted-foreground" />
+          )}
+        </Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(c)}>
+          <Pencil className="w-4 h-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-destructive hover:text-destructive"
+          onClick={() => onDelete(c.id)}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export function CommercialCalendarsManager() {
   const [commercials, setCommercials] = useState<CommercialCalendar[]>([]);
@@ -96,7 +153,6 @@ export function CommercialCalendarsManager() {
   };
 
   const handleEmailBlur = () => {
-    // Auto-rellenar calendar_id con el email si está vacío
     if (formData.email && !formData.calendar_id) {
       setFormData((p) => ({ ...p, calendar_id: p.email }));
     }
@@ -107,7 +163,6 @@ export function CommercialCalendarsManager() {
       toast.error('Nombre, email y Calendar ID son requeridos');
       return;
     }
-
     setIsSaving(true);
     try {
       if (editingId) {
@@ -153,144 +208,149 @@ export function CommercialCalendarsManager() {
   const activeCount = commercials.filter((c) => c.status === 'active').length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">Comerciales</h2>
-          <p className="text-sm text-muted-foreground">
-            {commercials.length} registrados · {activeCount} activos
-          </p>
-        </div>
-        <Button onClick={openCreate} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Agregar comercial
-        </Button>
+      <div>
+        <h2 className="text-lg font-semibold text-foreground">Equipo Comercial</h2>
+        <p className="text-sm text-muted-foreground">
+          Gestiona los comerciales y grupos para asignación de bookings
+        </p>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
-        </div>
-      ) : commercials.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          No hay comerciales registrados
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {countries.map((country) => (
-            <div key={country}>
-              {/* Country header */}
-              <div className="flex items-center gap-2 mb-3">
-                <span className="font-medium text-foreground">{getCountryName(country)}</span>
-                <Badge variant="secondary">{grouped[country].length}</Badge>
-              </div>
+      <Tabs defaultValue="comerciales" className="w-full">
+        <TabsList className="grid grid-cols-2 w-full max-w-xs">
+          <TabsTrigger value="comerciales">Comerciales</TabsTrigger>
+          <TabsTrigger value="grupos">Grupos</TabsTrigger>
+        </TabsList>
 
-              {/* Comerciales del país */}
-              <div className="grid gap-2">
-                {grouped[country].map((c) => (
-                  <div
-                    key={c.id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-border bg-card"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm text-foreground truncate">
-                          {c.name}
-                        </span>
-                        {c.status === 'inactive' && (
-                          <Badge variant="outline" className="text-xs shrink-0">
-                            Inactivo
-                          </Badge>
-                        )}
-                      </div>
-                      <span className="text-xs text-muted-foreground truncate block">
-                        {c.calendar_id}
-                      </span>
-                    </div>
+        {/* Tab: Comerciales */}
+        <TabsContent value="comerciales" className="mt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {commercials.length} registrados · {activeCount} activos · {countries.length}{' '}
+              {countries.length === 1 ? 'país' : 'países'}
+            </p>
+            <Button onClick={openCreate} size="sm" className="gap-2">
+              <Plus className="w-4 h-4" />
+              Agregar
+            </Button>
+          </div>
 
-                    <div className="flex items-center gap-1 shrink-0 ml-3">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        title={c.status === 'active' ? 'Desactivar' : 'Activar'}
-                        onClick={() => handleToggle(c)}
-                      >
-                        {c.status === 'active' ? (
-                          <UserCheck className="w-4 h-4 text-green-500" />
-                        ) : (
-                          <UserX className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => openEdit(c)}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => setDeleteId(c.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+          {isLoading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </div>
+          ) : commercials.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">
+              No hay comerciales registrados
+            </div>
+          ) : (
+            <Tabs defaultValue={countries[0]} className="w-full">
+              {/* Tabs de países */}
+              <TabsList className="flex flex-wrap h-auto gap-1 bg-muted p-1 mb-2">
+                <TabsTrigger value="__all__" className="text-xs gap-1.5">
+                  Todos
+                  <Badge variant="secondary" className="text-xs px-1.5 py-0 h-4">
+                    {commercials.length}
+                  </Badge>
+                </TabsTrigger>
+                {countries.map((country) => (
+                  <TabsTrigger key={country} value={country} className="text-xs gap-1.5">
+                    {getCountryName(country)}
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0 h-4">
+                      {grouped[country].length}
+                    </Badge>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+
+              {/* Tab: Todos */}
+              <TabsContent value="__all__" className="space-y-4 mt-0">
+                {countries.map((country) => (
+                  <div key={country} className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">
+                      {getCountryName(country)}
+                    </p>
+                    <div className="space-y-1.5">
+                      {grouped[country].map((c) => (
+                        <CommercialCard
+                          key={c.id}
+                          c={c}
+                          onEdit={openEdit}
+                          onToggle={handleToggle}
+                          onDelete={setDeleteId}
+                        />
+                      ))}
                     </div>
                   </div>
                 ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+              </TabsContent>
+
+              {/* Tab por país */}
+              {countries.map((country) => (
+                <TabsContent key={country} value={country} className="space-y-1.5 mt-0">
+                  {grouped[country].map((c) => (
+                    <CommercialCard
+                      key={c.id}
+                      c={c}
+                      onEdit={openEdit}
+                      onToggle={handleToggle}
+                      onDelete={setDeleteId}
+                    />
+                  ))}
+                </TabsContent>
+              ))}
+            </Tabs>
+          )}
+        </TabsContent>
+
+        {/* Tab: Grupos */}
+        <TabsContent value="grupos" className="mt-4">
+          <CommercialGroupsManager />
+        </TabsContent>
+      </Tabs>
 
       {/* Modal crear/editar */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {editingId ? 'Editar comercial' : 'Agregar comercial'}
-            </DialogTitle>
+            <DialogTitle>{editingId ? 'Editar comercial' : 'Agregar comercial'}</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 mt-2">
+          <div className="space-y-3 mt-2">
+            <div className="space-y-1.5">
+              <Label>Nombre completo</Label>
+              <Input
+                placeholder="Ej: María López"
+                value={formData.name}
+                onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                placeholder="comercial@gmail.com"
+                value={formData.email}
+                onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
+                onBlur={handleEmailBlur}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Calendar ID</Label>
+              <Input
+                placeholder="comercial@gmail.com"
+                value={formData.calendar_id}
+                onChange={(e) => setFormData((p) => ({ ...p, calendar_id: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Normalmente es el mismo email del comercial.
+              </p>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5 col-span-2">
-                <Label>Nombre completo</Label>
-                <Input
-                  placeholder="Ej: María López"
-                  value={formData.name}
-                  onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
-                />
-              </div>
-
-              <div className="space-y-1.5 col-span-2">
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  placeholder="comercial@gmail.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
-                  onBlur={handleEmailBlur}
-                />
-              </div>
-
-              <div className="space-y-1.5 col-span-2">
-                <Label>Calendar ID</Label>
-                <Input
-                  placeholder="comercial@gmail.com"
-                  value={formData.calendar_id}
-                  onChange={(e) => setFormData((p) => ({ ...p, calendar_id: e.target.value }))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Normalmente es el mismo email. Es el calendario que compartió contigo.
-                </p>
-              </div>
-
               <div className="space-y-1.5">
                 <Label>País</Label>
                 <Select
@@ -327,20 +387,20 @@ export function CommercialCalendarsManager() {
                   </SelectContent>
                 </Select>
               </div>
-
-              <div className="space-y-1.5 col-span-2">
-                <Label>Empresa (opcional)</Label>
-                <Input
-                  placeholder="Ej: Effi Systems"
-                  value={formData.empresa ?? ''}
-                  onChange={(e) =>
-                    setFormData((p) => ({ ...p, empresa: e.target.value || null }))
-                  }
-                />
-              </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="space-y-1.5">
+              <Label>Empresa (opcional)</Label>
+              <Input
+                placeholder="Ej: Effi Systems"
+                value={formData.empresa ?? ''}
+                onChange={(e) =>
+                  setFormData((p) => ({ ...p, empresa: e.target.value || null }))
+                }
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
               <Button variant="outline" onClick={() => setModalOpen(false)}>
                 Cancelar
               </Button>
@@ -359,7 +419,7 @@ export function CommercialCalendarsManager() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar este comercial?</AlertDialogTitle>
             <AlertDialogDescription>
-              Los bookings asignados a este comercial quedarán sin calendario vinculado.
+              Los bookings asignados quedarán sin calendario vinculado.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

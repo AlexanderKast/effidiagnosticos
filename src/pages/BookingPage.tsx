@@ -156,23 +156,9 @@ export default function BookingPage() {
           setAvailableSlots(available);
           return;
         }
-      } else if (booking.n8n_get_availability_url) {
-        const response = await fetch(booking.n8n_get_availability_url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ booking_id: booking.booking_id, date: fecha }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const slots = data.slots || data.available_slots || [];
-          setAvailableSlots(slots);
-          return;
-        }
       }
 
-      // Demo fallback
-      setAvailableSlots(['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
+      setAvailableSlots([]);
     } catch (error) {
       console.error('Error fetching availability:', error);
       setAvailableSlots(['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
@@ -324,28 +310,6 @@ export default function BookingPage() {
             bookingDetails: { ...bookingDetails, gcal_link: result.data?.gcal_link },
           },
         });
-      } else if (booking.n8n_create_booking_url) {
-        // N8N path (legacy)
-        const response = await fetch(booking.n8n_create_booking_url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            booking_id: booking.booking_id,
-            ...formDataWithLabels,
-            date: fecha,
-            time: selectedTime,
-          }),
-        });
-
-        let webhookData = null;
-        try { webhookData = await response.json(); } catch { /* non-JSON */ }
-
-        trackEvent('booking_complete', { date: fecha, time: selectedTime, booking_name: booking.name });
-        navigate('/confirmacion', { state: { webhookResponse: webhookData, bookingDetails } });
-      } else {
-        trackEvent('booking_complete', { date: fecha, time: selectedTime, booking_name: booking.name });
-        navigate('/confirmacion', { state: { bookingDetails } });
-      }
     } catch (error) {
       console.error('Error submitting booking:', error);
       navigate('/confirmacion', {
