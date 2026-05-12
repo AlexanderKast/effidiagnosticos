@@ -120,13 +120,15 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchive
         }
       );
       const result = await resp.json();
-      if (result.gcal_html_link) {
-        setGcalLink(result.gcal_html_link);
-        onUpdated(appointment.id, {
-          gcal_event_id: result.gcal_event_id,
-          gcal_html_link: result.gcal_html_link,
-        } as Partial<AppointmentCRM>);
+      if (!resp.ok || !result.ok) {
+        throw new Error(result.error || `Error del servidor: ${resp.status}`);
       }
+      setGcalLink(result.gcal_html_link);
+      onUpdated(appointment.id, {
+        gcal_event_id: result.gcal_event_id,
+        gcal_html_link: result.gcal_html_link,
+      } as Partial<AppointmentCRM>);
+      toast.success('Evento creado en Google Calendar.');
     } catch (err) {
       console.error('[CRMSheet] createGcal error:', err);
       toast.error('Error al crear el evento de Google Calendar.');

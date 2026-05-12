@@ -62,23 +62,33 @@ async function createGoogleCalendarEvent(params: {
   calendarId: string
   title: string
   fecha: string
-  hora: string
+  startTime: string
   endTime: string
   timezone: string
-  attendeeEmail: string
-  attendeeName: string
+  leadEmail: string
+  leadName: string
+  commercialEmail?: string
+  commercialName?: string
 }): Promise<{ id: string; htmlLink: string }> {
-  const startDatetime = `${params.fecha}T${params.hora}:00`
-  const endDatetime = `${params.fecha}T${params.endTime}:00`
+  // Asegurar formato HH:MM:SS
+  const pad = (t: string) => t.length === 5 ? `${t}:00` : t
+  const startDatetime = `${params.fecha}T${pad(params.startTime)}`
+  const endDatetime = `${params.fecha}T${pad(params.endTime)}`
+
+  // Construir lista de asistentes
+  const attendees: { email: string; displayName?: string }[] = []
+  if (params.commercialEmail) {
+    attendees.push({ email: params.commercialEmail, displayName: params.commercialName })
+  }
+  if (params.leadEmail && params.leadEmail !== 'sin-email@manual.com') {
+    attendees.push({ email: params.leadEmail, displayName: params.leadName })
+  }
 
   const event = {
     summary: params.title,
     start: { dateTime: startDatetime, timeZone: params.timezone },
     end: { dateTime: endDatetime, timeZone: params.timezone },
-    attendees:
-      params.attendeeEmail !== 'sin-email@manual.com'
-        ? [{ email: params.attendeeEmail, displayName: params.attendeeName }]
-        : [],
+    attendees,
     reminders: {
       useDefault: false,
       overrides: [
@@ -94,19 +104,22 @@ async function createGoogleCalendarEvent(params: {
     },
   }
 
-  const resp = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(params.calendarId)}/events?conferenceDataVersion=1&sendUpdates=all`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${params.accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(event),
-    }
-  )
+  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(params.calendarId)}/events?conferenceDataVersion=1&sendUpdates=all`
+  console.log('[create-gcal] POST', url, 'attendees:', attendees.map(a => a.email))
 
-  if (!resp.ok) throw new Error(`GCal failed: ${resp.status} ${await resp.text()}`)
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${params.accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(event),
+  })
+
+  if (!resp.ok) {
+    const errBody = await resp.text()
+    throw new Error(`GCal ${resp.status}: ${errBody}`)
+  }
   return resp.json()
 }
 
@@ -156,33 +169,56 @@ Deno.serve(async (req) => {
 
     const accessToken = await getGoogleAccessToken()
     if (!accessToken) {
-      return Response.json({ ok: false, error: 'No se pudo obtener el token de Google' }, { status: 502, headers: CORS_HEADERS })
+      return Response.json({ ok: false, error: 'No hay token de Google configurado. Conecta la cuenta en el panel de administración.' }, { status: 502, headers: CORS_HEADERS })
     }
 
+    // Calendario destino: primero intentar el calendario del comercial asignado
     let calendarId: string = (config.gcal_calendar_id as string) ?? 'primary'
+    let commercialEmail: string | undefined
+    let commercialName: string | undefined
 
     if (appointment.assigned_commercial_id) {
       const { data: commercial, error: commercialError } = await supabase
         .from('commercial_calendars')
-        .select('calendar_id')
+        .select('calendar_id, email, name')
         .eq('id', appointment.assigned_commercial_id)
         .single()
 
-      if (!commercialError && commercial?.calendar_id) {
-        calendarId = commercial.calendar_id as string
+      if (!commercialError && commercial) {
+        calendarId = (commercial.calendar_id as string) || calendarId
+        commercialEmail = commercial.email as string
+        commercialName = commercial.name as string
+      }
+    } else if (appointment.assigned_commercial_name) {
+      // Si hay nombre pero no ID (legado), buscar por nombre en commercial_calendars
+      const { data: commercial } = await supabase
+        .from('commercial_calendars')
+        .select('calendar_id, email, name')
+        .eq('name', appointment.assigned_commercial_name)
+        .eq('status', 'active')
+        .maybeSingle()
+
+      if (commercial) {
+        calendarId = (commercial.calendar_id as string) || calendarId
+        commercialEmail = commercial.email as string
+        commercialName = commercial.name as string
       }
     }
+
+    console.log('[create-gcal] calendarId:', calendarId, 'commercial:', commercialEmail)
 
     const gcalEvent = await createGoogleCalendarEvent({
       accessToken,
       calendarId,
       title: `${appointment.lead_name} – ${serviceName}`,
       fecha: appointment.appointment_date,
-      hora: appointment.start_time,
+      startTime: appointment.start_time,
       endTime: appointment.end_time,
       timezone: appointment.timezone ?? 'America/Bogota',
-      attendeeEmail: appointment.lead_email ?? 'sin-email@manual.com',
-      attendeeName: appointment.lead_name,
+      leadEmail: appointment.lead_email ?? '',
+      leadName: appointment.lead_name,
+      commercialEmail,
+      commercialName,
     })
 
     await supabase
