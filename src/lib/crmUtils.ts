@@ -47,6 +47,41 @@ export const CRM_TIPOS_MARKETING = [
   'Otro',
 ];
 
+export type CRMCanalOrigen =
+  | 'WhatsApp'
+  | 'Calendario'
+  | 'Instagram'
+  | 'Facebook'
+  | 'TikTok'
+  | 'Referido'
+  | 'Llamada'
+  | 'Email'
+  | 'Otro';
+
+export const CRM_CANALES: CRMCanalOrigen[] = [
+  'WhatsApp',
+  'Calendario',
+  'Instagram',
+  'Facebook',
+  'TikTok',
+  'Referido',
+  'Llamada',
+  'Email',
+  'Otro',
+];
+
+export const CANAL_ICONS: Record<CRMCanalOrigen, string> = {
+  WhatsApp: '💬',
+  Calendario: '📅',
+  Instagram: '📸',
+  Facebook: '👤',
+  TikTok: '🎵',
+  Referido: '🤝',
+  Llamada: '📞',
+  Email: '✉️',
+  Otro: '🔗',
+};
+
 export const ESTADO_COLORS: Record<CRMEstado, string> = {
   'Cerrado': 'bg-green-100 text-green-800 border-green-200',
   'Proceso de cierre': 'bg-blue-100 text-blue-800 border-blue-200',
@@ -66,6 +101,7 @@ export interface CRMFields {
   crm_monto_venta: number | null;
   crm_estado_cliente: CRMEstado | null;
   crm_observaciones: string | null;
+  crm_canal_origen: CRMCanalOrigen | null;
 }
 
 export interface AppointmentCRM extends CRMFields {
@@ -83,6 +119,7 @@ export interface AppointmentCRM extends CRMFields {
   assigned_commercial_id: string | null;
   assigned_commercial_name: string | null;
   created_at: string;
+  archived: boolean;
 }
 
 const PHONE_CANDIDATES = [

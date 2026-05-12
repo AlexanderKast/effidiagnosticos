@@ -1,4 +1,4 @@
-import { Search, X } from 'lucide-react';
+import { Search, X, Archive } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,11 +18,11 @@ interface CRMFiltersProps {
 }
 
 export function CRMFilters({ filters, onChange, total }: CRMFiltersProps) {
-  const hasFilters = filters.estado || filters.soloVentas || filters.search;
+  const hasFilters = filters.estado || filters.soloVentas || filters.search || filters.verArchivados;
 
   return (
-    <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-      <div className="relative flex-1 min-w-[200px]">
+    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-start sm:items-center w-full">
+      <div className="relative w-full sm:flex-1 sm:min-w-[200px]">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
           placeholder="Buscar por nombre o email..."
@@ -36,7 +36,7 @@ export function CRMFilters({ filters, onChange, total }: CRMFiltersProps) {
         value={filters.estado ?? 'todos'}
         onValueChange={(v) => onChange({ ...filters, estado: v === 'todos' ? undefined : v })}
       >
-        <SelectTrigger className="w-[200px]">
+        <SelectTrigger className="w-full sm:w-[200px]">
           <SelectValue placeholder="Todos los estados" />
         </SelectTrigger>
         <SelectContent>
@@ -55,6 +55,16 @@ export function CRMFilters({ filters, onChange, total }: CRMFiltersProps) {
         Solo ventas
       </Button>
 
+      <Button
+        variant={filters.verArchivados ? 'secondary' : 'outline'}
+        size="sm"
+        className="gap-1.5"
+        onClick={() => onChange({ ...filters, verArchivados: !filters.verArchivados || undefined })}
+      >
+        <Archive className="w-3.5 h-3.5" />
+        Archivados
+      </Button>
+
       {hasFilters && (
         <Button
           variant="ghost"
@@ -67,7 +77,7 @@ export function CRMFilters({ filters, onChange, total }: CRMFiltersProps) {
         </Button>
       )}
 
-      <span className="text-sm text-muted-foreground whitespace-nowrap ml-auto">
+      <span className="text-sm text-muted-foreground whitespace-nowrap sm:ml-auto">
         {total} registro{total !== 1 ? 's' : ''}
       </span>
     </div>

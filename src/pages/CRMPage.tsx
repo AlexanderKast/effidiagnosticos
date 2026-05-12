@@ -164,6 +164,11 @@ export default function CRMPage() {
     }
   };
 
+  const handleArchived = (id: string) => {
+    setAppointments((prev) => prev.filter((a) => a.id !== id));
+    setSelectedAppt(null);
+  };
+
   if (authLoading || (!user && !authLoading)) return null;
 
   return (
@@ -251,6 +256,7 @@ export default function CRMPage() {
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         onUpdated={handleUpdated}
+        onArchived={handleArchived}
         commercials={commercials}
       />
 

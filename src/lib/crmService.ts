@@ -11,6 +11,7 @@ export interface CRMFilters {
   estado?: string;
   soloVentas?: boolean;
   search?: string;
+  verArchivados?: boolean;
 }
 
 export async function fetchAppointmentsByBooking(
@@ -22,11 +23,12 @@ export async function fetchAppointmentsByBooking(
     .select(`
       id, booking_id, lead_name, lead_email, lead_company, lead_notes,
       form_data, appointment_date, start_time, end_time, status,
-      assigned_commercial_id, assigned_commercial_name, created_at,
+      assigned_commercial_id, assigned_commercial_name, created_at, archived,
       crm_venta_realizada, crm_tipo_marketing, crm_tipo_cliente,
       crm_monto_venta, crm_estado_cliente, crm_observaciones, crm_canal_origen
     `)
     .eq('booking_id', bookingId)
+    .eq('archived', filters.verArchivados ? true : false)
     .order('appointment_date', { ascending: false })
     .order('start_time', { ascending: false });
 
@@ -71,6 +73,15 @@ export interface LeadEditFields {
   phone: string;
   assigned_commercial_id: string | null;
   assigned_commercial_name: string | null;
+}
+
+export async function archiveAppointment(id: string, archived: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('appointments')
+    .update({ archived })
+    .eq('id', id);
+
+  if (error) throw error;
 }
 
 export async function updateAppointmentLead(

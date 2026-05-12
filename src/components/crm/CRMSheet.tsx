@@ -19,7 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import { Phone, Mail, Building2, Calendar, Clock, User, UserPlus, Pencil, X, Save, Loader2 } from 'lucide-react';
+import { Phone, Mail, Building2, Calendar, User, UserPlus, Pencil, X, Save, Loader2, Archive, ArchiveRestore } from 'lucide-react';
 import {
   AppointmentCRM,
   CRMEstado,
@@ -35,20 +35,22 @@ import {
   formatDate,
   formatTime,
 } from '@/lib/crmUtils';
-import { updateAppointmentCRM, updateAppointmentLead, CommercialOption } from '@/lib/crmService';
+import { updateAppointmentCRM, updateAppointmentLead, archiveAppointment, CommercialOption } from '@/lib/crmService';
 
 interface CRMSheetProps {
   appointment: AppointmentCRM | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdated: (id: string, fields: Partial<AppointmentCRM>) => void;
+  onArchived: (id: string) => void;
   commercials: CommercialOption[];
 }
 
-export function CRMSheet({ appointment, open, onOpenChange, onUpdated, commercials }: CRMSheetProps) {
+export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchived, commercials }: CRMSheetProps) {
   const [saving, setSaving] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [savingLead, setSavingLead] = useState(false);
+  const [archiving, setArchiving] = useState(false);
 
   const [editForm, setEditForm] = useState({
     lead_name: '',
@@ -90,6 +92,21 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, commercia
     },
     [appointment, onUpdated]
   );
+
+  const handleArchive = async () => {
+    if (!appointment) return;
+    setArchiving(true);
+    try {
+      const newArchived = !appointment.archived;
+      await archiveAppointment(appointment.id, newArchived);
+      onArchived(appointment.id);
+      onOpenChange(false);
+    } catch (err) {
+      console.error('[CRMSheet] archive error:', err);
+    } finally {
+      setArchiving(false);
+    }
+  };
 
   const handleSaveLead = async () => {
     if (!appointment) return;
@@ -410,6 +427,23 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, commercia
                 Guardando...
               </p>
             )}
+
+            <Separator className="my-5" />
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full gap-2 text-muted-foreground hover:text-destructive hover:border-destructive"
+              onClick={handleArchive}
+              disabled={archiving}
+            >
+              {archiving
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : appointment.archived
+                  ? <><ArchiveRestore className="w-4 h-4" /> Restaurar lead</>
+                  : <><Archive className="w-4 h-4" /> Archivar lead</>
+              }
+            </Button>
           </>
         )}
       </SheetContent>
