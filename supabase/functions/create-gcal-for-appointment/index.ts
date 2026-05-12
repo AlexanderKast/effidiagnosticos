@@ -96,15 +96,9 @@ async function createGoogleCalendarEvent(params: {
         { method: 'popup', minutes: 30 },
       ],
     },
-    conferenceData: {
-      createRequest: {
-        requestId: crypto.randomUUID(),
-        conferenceSolutionKey: { type: 'hangoutsMeet' },
-      },
-    },
   }
 
-  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(params.calendarId)}/events?conferenceDataVersion=1&sendUpdates=all`
+  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(params.calendarId)}/events?sendUpdates=all`
   console.log('[create-gcal] POST', url, 'attendees:', attendees.map(a => a.email))
 
   const resp = await fetch(url, {
