@@ -23,13 +23,9 @@ const COUNTRY_NAMES: Record<string, string> = {
 // id is first column so UPDATE can find rows by UUID
 const SHEET_HEADERS = [
   'id',
-  'booking_id', 'service_name', 'country', 'date', 'time', 'timezone',
-  'duration_min', 'name', 'email', 'whatsapp', 'tipo_cliente', 'perfil_resumen',
-  'empresa', 'ya_vende', 'tipo_pago', 'tiene_web', 'usa_chatbot', 'envios_mes',
-  'tipo_comerciante', 'notes', 'assigned_user', 'assigned_calendar_id',
-  'commercial_id', 'gcal_event_id', 'gcal_event_link', 'status', 'created_at',
-  'crm_estado', 'crm_venta_realizada', 'crm_monto_venta',
-  'crm_tipo_cliente', 'crm_tipo_marketing', 'crm_canal_origen', 'crm_observaciones',
+  'Fecha', 'Chat', 'Comercial', 'Nombre del cliente', 'Numero del cliente',
+  'Ventas Realizadas', 'Numero de anuncio', 'Tipo de Cliente',
+  'Monto de la venta', 'Estado de cliente',
 ];
 
 // ── Google Service Account JWT + token ──────────────────────────────────────
@@ -202,49 +198,25 @@ async function updateRow(
 
 function buildRow(
   appt: Record<string, any>,
-  bc: Record<string, any> | null,
+  _bc: Record<string, any> | null,
   assignedUser: string,
-  assignedCalendarId: string,
-  commercialId: string,
-  countryTab: string,
+  _assignedCalendarId: string,
+  _commercialId: string,
+  _countryTab: string,
 ): string[] {
   const fd: Record<string, string> = appt.form_data ?? {};
   return [
     appt.id ?? '',
-    appt.booking_id ?? '',
-    bc?.name ?? '',
-    countryTab,
     appt.appointment_date ?? '',
-    appt.start_time ?? '',
-    appt.timezone ?? '',
-    String(appt.duration_minutes ?? ''),
-    appt.lead_name ?? '',
-    appt.lead_email ?? '',
-    fd.whatsapp ?? '',
-    fd.tipo_cliente ?? '',
-    fd.perfil_resumen ?? '',
-    appt.lead_company ?? fd.empresa ?? '',
-    fd.ya_vende ?? '',
-    fd.tipo_pago ?? '',
-    fd.tiene_web ?? '',
-    fd.usa_chatbot ?? '',
-    fd.envios_mes ?? '',
-    fd.tipo_comerciante ?? '',
-    appt.lead_notes ?? fd.notes ?? '',
+    '',
     assignedUser,
-    assignedCalendarId,
-    commercialId,
-    appt.gcal_event_id ?? '',
-    appt.gcal_html_link ?? '',
-    appt.status ?? '',
-    appt.created_at ?? '',
-    appt.crm_estado_cliente ?? '',
-    appt.crm_venta_realizada ? 'TRUE' : 'FALSE',
-    appt.crm_monto_venta != null ? String(appt.crm_monto_venta) : '',
-    appt.crm_tipo_cliente ?? '',
-    appt.crm_tipo_marketing ?? '',
+    appt.lead_name ?? '',
+    fd.whatsapp ?? '',
+    appt.crm_venta_realizada ? 'SI' : 'NO',
     appt.crm_canal_origen ?? '',
-    appt.crm_observaciones ?? '',
+    appt.crm_tipo_cliente ?? '',
+    appt.crm_monto_venta != null ? String(appt.crm_monto_venta) : '',
+    appt.crm_estado_cliente ?? '',
   ];
 }
 
