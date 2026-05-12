@@ -206,8 +206,9 @@ function buildRow(
   _countryTab: string,
 ): string[] {
   const fd: Record<string, string> = appt.form_data ?? {};
+  const fechaIngreso = appt.created_at ? appt.created_at.slice(0, 10) : (appt.appointment_date ?? '');
   return [
-    appt.appointment_date ?? '',
+    fechaIngreso,
     '',
     assignedUser,
     appt.lead_name ?? '',

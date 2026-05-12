@@ -44,7 +44,6 @@ interface CRMNewRecordDialogProps {
 const EMPTY = {
   lead_name: '',
   phone: '',
-  appointment_date: new Date().toISOString().slice(0, 10),
   commercial_id: '',
   crm_canal_origen: '' as CRMCanalOrigen | '',
   crm_tipo_cliente: '' as CRMTipoCliente | '',
@@ -84,7 +83,7 @@ export function CRMNewRecordDialog({
           lead_name: form.lead_name.trim(),
           lead_email: 'sin-email@manual.com',
           form_data: form.phone.trim() ? { telefono: form.phone.trim() } : {},
-          appointment_date: form.appointment_date,
+          appointment_date: new Date().toISOString().slice(0, 10),
           start_time: '09:00',
           end_time: '09:30',
           duration_minutes: 30,
@@ -143,16 +142,6 @@ export function CRMNewRecordDialog({
               value={form.phone}
               onChange={(v) => set('phone', v)}
               defaultCountry={bookingCountry}
-            />
-          </div>
-
-          {/* Fecha */}
-          <div className="space-y-1.5">
-            <Label>Fecha</Label>
-            <Input
-              type="date"
-              value={form.appointment_date}
-              onChange={(e) => set('appointment_date', e.target.value)}
             />
           </div>
 
