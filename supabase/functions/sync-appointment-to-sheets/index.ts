@@ -20,11 +20,11 @@ const COUNTRY_NAMES: Record<string, string> = {
   HN: 'Honduras',
 };
 
-// id va al final para no desplazar las columnas visibles
+// id en columna L para no desplazar las columnas visibles (K = Observaciones)
 const SHEET_HEADERS = [
   'Fecha', 'Chat', 'Comercial', 'Nombre del cliente', 'Numero del cliente',
   'Ventas Realizadas', 'Numero de anuncio', 'Tipo de Cliente',
-  'Monto de la venta', 'Estado de cliente',
+  'Monto de la venta', 'Estado de cliente', 'Observaciones',
   'id',
 ];
 
@@ -217,7 +217,8 @@ function buildRow(
     appt.crm_tipo_cliente ?? '',
     appt.crm_monto_venta != null ? String(appt.crm_monto_venta) : '',
     appt.crm_estado_cliente ?? '',
-    appt.id ?? '', // id al final (columna K) para lookup en UPDATEs
+    appt.crm_observaciones ?? '',
+    appt.id ?? '', // id en columna L para lookup en UPDATEs
   ];
 }
 
