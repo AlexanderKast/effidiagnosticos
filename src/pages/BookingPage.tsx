@@ -10,6 +10,7 @@ import { DatePickerStep } from '@/components/booking/DatePickerStep';
 import { TimeSlotStep } from '@/components/booking/TimeSlotStep';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/PhoneInput';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -715,8 +716,8 @@ export default function BookingPage() {
                             />
                           )}
 
-                          {/* Text, Email, Tel inputs */}
-                          {['text', 'email', 'tel'].includes(field.type) && (
+                          {/* Text, Email inputs */}
+                          {['text', 'email'].includes(field.type) && (
                             <Input
                               id={field.id}
                               type={field.type}
@@ -724,6 +725,16 @@ export default function BookingPage() {
                               onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })}
                               placeholder={field.placeholder}
                               className={formErrors[field.id] ? 'border-destructive' : ''}
+                            />
+                          )}
+
+                          {/* Tel input con selector de país */}
+                          {field.type === 'tel' && (
+                            <PhoneInput
+                              value={formData[field.id] || ''}
+                              onChange={(v) => setFormData({ ...formData, [field.id]: v })}
+                              defaultCountry={booking?.country || 'CO'}
+                              error={!!formErrors[field.id]}
                             />
                           )}
 

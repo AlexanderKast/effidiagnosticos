@@ -264,6 +264,7 @@ export default function CRMPage() {
         open={newRecordOpen}
         onOpenChange={setNewRecordOpen}
         bookingId={bookingId!}
+        bookingCountry={bookingCountry}
         commercials={commercials}
         onCreated={handleCreated}
       />

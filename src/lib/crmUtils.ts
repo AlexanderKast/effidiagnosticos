@@ -120,6 +120,8 @@ export interface AppointmentCRM extends CRMFields {
   assigned_commercial_name: string | null;
   created_at: string;
   archived: boolean;
+  gcal_event_id: string | null;
+  gcal_html_link: string | null;
 }
 
 const PHONE_CANDIDATES = [

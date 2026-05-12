@@ -13,10 +13,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
+import { PhoneInput } from '@/components/ui/PhoneInput';
 import { supabase } from '@/integrations/supabase/client';
 import { CommercialOption } from '@/lib/crmService';
 import {
@@ -34,6 +34,7 @@ interface CRMNewRecordDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   bookingId: string;
+  bookingCountry?: string;
   commercials: CommercialOption[];
   onCreated: (appointment: AppointmentCRM) => void;
 }
@@ -52,6 +53,7 @@ export function CRMNewRecordDialog({
   open,
   onOpenChange,
   bookingId,
+  bookingCountry = 'CO',
   commercials,
   onCreated,
 }: CRMNewRecordDialogProps) {
@@ -133,10 +135,10 @@ export function CRMNewRecordDialog({
           {/* Teléfono */}
           <div className="space-y-1.5">
             <Label>Número de WhatsApp</Label>
-            <Input
-              placeholder="+57 300 000 0000"
+            <PhoneInput
               value={form.phone}
-              onChange={(e) => set('phone', e.target.value)}
+              onChange={(v) => set('phone', v)}
+              defaultCountry={bookingCountry}
             />
           </div>
 

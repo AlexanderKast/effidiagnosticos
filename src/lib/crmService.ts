@@ -24,6 +24,7 @@ export async function fetchAppointmentsByBooking(
       id, booking_id, lead_name, lead_email, lead_company, lead_notes,
       form_data, appointment_date, start_time, end_time, status,
       assigned_commercial_id, assigned_commercial_name, created_at, archived,
+      gcal_event_id, gcal_html_link,
       crm_venta_realizada, crm_tipo_marketing, crm_tipo_cliente,
       crm_monto_venta, crm_estado_cliente, crm_observaciones, crm_canal_origen
     `)

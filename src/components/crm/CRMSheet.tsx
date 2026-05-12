@@ -19,7 +19,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import { Phone, Mail, Building2, Calendar, User, UserPlus, Pencil, X, Save, Loader2, Archive, ArchiveRestore } from 'lucide-react';
+import { Phone, Mail, Building2, Calendar, User, UserPlus, Pencil, X, Save, Loader2, Archive, ArchiveRestore, CalendarPlus, ExternalLink } from 'lucide-react';
+import { PhoneInput, getWhatsAppLink } from '@/components/ui/PhoneInput';
 import {
   AppointmentCRM,
   CRMEstado,
@@ -51,6 +52,8 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchive
   const [isEditing, setIsEditing] = useState(false);
   const [savingLead, setSavingLead] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [creatingGcal, setCreatingGcal] = useState(false);
+  const [gcalLink, setGcalLink] = useState<string | null>(null);
 
   const [editForm, setEditForm] = useState({
     lead_name: '',
@@ -92,6 +95,42 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchive
     },
     [appointment, onUpdated]
   );
+
+  useEffect(() => {
+    setGcalLink(appointment?.gcal_html_link ?? null);
+  }, [appointment?.id]);
+
+  const handleCreateGcal = async () => {
+    if (!appointment) return;
+    setCreatingGcal(true);
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: { session } } = await supabase.auth.getSession();
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-gcal-for-appointment`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ appointment_id: appointment.id }),
+        }
+      );
+      const result = await resp.json();
+      if (result.gcal_html_link) {
+        setGcalLink(result.gcal_html_link);
+        onUpdated(appointment.id, {
+          gcal_event_id: result.gcal_event_id,
+          gcal_html_link: result.gcal_html_link,
+        } as Partial<AppointmentCRM>);
+      }
+    } catch (err) {
+      console.error('[CRMSheet] createGcal error:', err);
+    } finally {
+      setCreatingGcal(false);
+    }
+  };
 
   const handleArchive = async () => {
     if (!appointment) return;
@@ -204,10 +243,9 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchive
             </div>
             <div className="space-y-1.5">
               <Label>Teléfono / WhatsApp</Label>
-              <Input
+              <PhoneInput
                 value={editForm.phone}
-                onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))}
-                placeholder="+57 300 000 0000"
+                onChange={(v) => setEditForm((p) => ({ ...p, phone: v }))}
               />
             </div>
             <div className="space-y-1.5">
@@ -286,7 +324,13 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchive
               {phone && (
                 <div className="flex items-center gap-2 text-sm">
                   <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <a href={`tel:${phone}`} className="font-medium">{phone}</a>
+                  {getWhatsAppLink(phone) ? (
+                    <a href={getWhatsAppLink(phone)!} target="_blank" rel="noopener noreferrer" className="font-medium text-green-600 hover:underline">
+                      {phone}
+                    </a>
+                  ) : (
+                    <span className="font-medium">{phone}</span>
+                  )}
                 </div>
               )}
               {appointment.lead_company && (
@@ -430,10 +474,31 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchive
 
             <Separator className="my-5" />
 
+            {/* Google Calendar */}
+            {gcalLink ? (
+              <a href={gcalLink} target="_blank" rel="noopener noreferrer" className="w-full">
+                <Button variant="outline" size="sm" className="w-full gap-2 text-blue-600 border-blue-200 hover:bg-blue-50">
+                  <ExternalLink className="w-4 h-4" />
+                  Ver en Google Calendar
+                </Button>
+              </a>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-2"
+                onClick={handleCreateGcal}
+                disabled={creatingGcal}
+              >
+                {creatingGcal ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarPlus className="w-4 h-4" />}
+                Crear evento en Google Calendar
+              </Button>
+            )}
+
             <Button
               variant="outline"
               size="sm"
-              className="w-full gap-2 text-muted-foreground hover:text-destructive hover:border-destructive"
+              className="w-full gap-2 mt-2 text-muted-foreground hover:text-destructive hover:border-destructive"
               onClick={handleArchive}
               disabled={archiving}
             >

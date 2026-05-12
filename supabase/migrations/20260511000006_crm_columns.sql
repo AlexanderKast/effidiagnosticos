@@ -17,7 +17,12 @@ ALTER TABLE public.appointments
       'Pendiente de respuesta','Cliente registrado',
       'NO Interesado','Trabajo','Mentorias'
     )),
-  ADD COLUMN IF NOT EXISTS crm_observaciones        TEXT;
+  ADD COLUMN IF NOT EXISTS crm_observaciones        TEXT,
+  ADD COLUMN IF NOT EXISTS crm_canal_origen         TEXT
+    CHECK (crm_canal_origen IN (
+      'WhatsApp','Calendario','Instagram','Facebook','TikTok',
+      'Referido','Llamada','Email','Otro'
+    ));
 
 CREATE INDEX IF NOT EXISTS idx_appointments_crm_estado
   ON public.appointments(booking_id, crm_estado_cliente);
