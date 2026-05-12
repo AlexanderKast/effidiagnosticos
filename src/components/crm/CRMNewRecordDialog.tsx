@@ -20,6 +20,7 @@ import { Loader2 } from 'lucide-react';
 import { PhoneInput } from '@/components/ui/PhoneInput';
 import { supabase } from '@/integrations/supabase/client';
 import { CommercialOption } from '@/lib/crmService';
+import { toast } from 'sonner';
 import {
   CRM_ESTADOS,
   CRM_CANALES,
@@ -108,6 +109,8 @@ export function CRMNewRecordDialog({
       setNameError('');
     } catch (err) {
       console.error('[CRMNewRecordDialog] error:', err);
+      const msg = err instanceof Error ? err.message : 'Error desconocido al crear el registro.';
+      toast.error(`Error al crear registro: ${msg}`);
     } finally {
       setSaving(false);
     }

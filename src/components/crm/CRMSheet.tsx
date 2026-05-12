@@ -37,6 +37,8 @@ import {
   formatTime,
 } from '@/lib/crmUtils';
 import { updateAppointmentCRM, updateAppointmentLead, archiveAppointment, CommercialOption } from '@/lib/crmService';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CRMSheetProps {
   appointment: AppointmentCRM | null;
@@ -89,6 +91,7 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchive
         onUpdated(appointment.id, fields as Partial<AppointmentCRM>);
       } catch (err) {
         console.error('[CRMSheet] save error:', err);
+        toast.error(err instanceof Error ? err.message : 'Error al guardar. Intenta de nuevo.');
       } finally {
         setSaving(null);
       }
@@ -104,7 +107,6 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchive
     if (!appointment) return;
     setCreatingGcal(true);
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
       const { data: { session } } = await supabase.auth.getSession();
       const resp = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-gcal-for-appointment`,
@@ -127,6 +129,7 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchive
       }
     } catch (err) {
       console.error('[CRMSheet] createGcal error:', err);
+      toast.error('Error al crear el evento de Google Calendar.');
     } finally {
       setCreatingGcal(false);
     }
@@ -142,6 +145,7 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchive
       onOpenChange(false);
     } catch (err) {
       console.error('[CRMSheet] archive error:', err);
+      toast.error(err instanceof Error ? err.message : 'Error al archivar.');
     } finally {
       setArchiving(false);
     }
@@ -176,9 +180,11 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchive
           ['whatsapp' in appointment.form_data ? 'whatsapp' : 'telefono']: fields.phone,
         },
       });
+      toast.success('Lead actualizado correctamente.');
       setIsEditing(false);
     } catch (err) {
       console.error('[CRMSheet] saveLead error:', err);
+      toast.error(err instanceof Error ? err.message : 'Error al guardar el lead.');
     } finally {
       setSavingLead(false);
     }

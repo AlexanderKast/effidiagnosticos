@@ -14,16 +14,147 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointments: {
+        Row: {
+          id: string
+          booking_id: string
+          lead_name: string
+          lead_email: string
+          lead_company: string | null
+          lead_notes: string | null
+          form_data: Json
+          appointment_date: string
+          start_time: string
+          end_time: string
+          timezone: string
+          duration_minutes: number
+          status: string
+          gcal_event_id: string | null
+          gcal_html_link: string | null
+          gcal_sync_status: string
+          gcal_sync_attempts: number
+          gcal_last_error: string | null
+          gcal_synced_at: string | null
+          confirmation_sent_at: string | null
+          reminder_sent_at: string | null
+          whatsapp_sent_at: string | null
+          source: string | null
+          ip_address: string | null
+          user_agent: string | null
+          created_at: string
+          updated_at: string
+          assigned_commercial_id: string | null
+          assigned_commercial_name: string | null
+          crm_venta_realizada: boolean
+          crm_tipo_marketing: string | null
+          crm_tipo_cliente: string | null
+          crm_monto_venta: number | null
+          crm_estado_cliente: string | null
+          crm_observaciones: string | null
+          crm_canal_origen: string | null
+          archived: boolean
+        }
+        Insert: {
+          id?: string
+          booking_id: string
+          lead_name: string
+          lead_email: string
+          lead_company?: string | null
+          lead_notes?: string | null
+          form_data?: Json
+          appointment_date: string
+          start_time: string
+          end_time: string
+          timezone?: string
+          duration_minutes?: number
+          status?: string
+          gcal_event_id?: string | null
+          gcal_html_link?: string | null
+          gcal_sync_status?: string
+          gcal_sync_attempts?: number
+          gcal_last_error?: string | null
+          gcal_synced_at?: string | null
+          confirmation_sent_at?: string | null
+          reminder_sent_at?: string | null
+          whatsapp_sent_at?: string | null
+          source?: string | null
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+          updated_at?: string
+          assigned_commercial_id?: string | null
+          assigned_commercial_name?: string | null
+          crm_venta_realizada?: boolean
+          crm_tipo_marketing?: string | null
+          crm_tipo_cliente?: string | null
+          crm_monto_venta?: number | null
+          crm_estado_cliente?: string | null
+          crm_observaciones?: string | null
+          crm_canal_origen?: string | null
+          archived?: boolean
+        }
+        Update: {
+          id?: string
+          booking_id?: string
+          lead_name?: string
+          lead_email?: string
+          lead_company?: string | null
+          lead_notes?: string | null
+          form_data?: Json
+          appointment_date?: string
+          start_time?: string
+          end_time?: string
+          timezone?: string
+          duration_minutes?: number
+          status?: string
+          gcal_event_id?: string | null
+          gcal_html_link?: string | null
+          gcal_sync_status?: string
+          gcal_sync_attempts?: number
+          gcal_last_error?: string | null
+          gcal_synced_at?: string | null
+          confirmation_sent_at?: string | null
+          reminder_sent_at?: string | null
+          whatsapp_sent_at?: string | null
+          source?: string | null
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+          updated_at?: string
+          assigned_commercial_id?: string | null
+          assigned_commercial_name?: string | null
+          crm_venta_realizada?: boolean
+          crm_tipo_marketing?: string | null
+          crm_tipo_cliente?: string | null
+          crm_monto_venta?: number | null
+          crm_estado_cliente?: string | null
+          crm_observaciones?: string | null
+          crm_canal_origen?: string | null
+          archived?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "booking_configs"
+            referencedColumns: ["booking_id"]
+          }
+        ]
+      }
       booking_configs: {
         Row: {
           active: boolean
           area: string
+          assignment_type: string
           booking_id: string
+          commercial_group_id: string | null
           country: string
           created_at: string
           duration: number
           expectations: Json
           form_fields: Json
+          gcal_calendar_id: string
           id: string
           n8n_create_booking_url: string
           n8n_get_availability_url: string
@@ -37,16 +168,20 @@ export type Database = {
           topics: Json
           tracking_pixels: Json | null
           updated_at: string
+          use_supabase_backend: boolean
         }
         Insert: {
           active?: boolean
           area?: string
+          assignment_type?: string
           booking_id: string
+          commercial_group_id?: string | null
           country?: string
           created_at?: string
           duration?: number
           expectations?: Json
           form_fields?: Json
+          gcal_calendar_id?: string
           id?: string
           n8n_create_booking_url?: string
           n8n_get_availability_url?: string
@@ -60,16 +195,20 @@ export type Database = {
           topics?: Json
           tracking_pixels?: Json | null
           updated_at?: string
+          use_supabase_backend?: boolean
         }
         Update: {
           active?: boolean
           area?: string
+          assignment_type?: string
           booking_id?: string
+          commercial_group_id?: string | null
           country?: string
           created_at?: string
           duration?: number
           expectations?: Json
           form_fields?: Json
+          gcal_calendar_id?: string
           id?: string
           n8n_create_booking_url?: string
           n8n_get_availability_url?: string
@@ -83,6 +222,7 @@ export type Database = {
           topics?: Json
           tracking_pixels?: Json | null
           updated_at?: string
+          use_supabase_backend?: boolean
         }
         Relationships: []
       }

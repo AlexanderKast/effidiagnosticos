@@ -57,12 +57,16 @@ export async function updateAppointmentCRM(
   id: string,
   fields: Partial<CRMFields> & { assigned_commercial_id?: string | null; assigned_commercial_name?: string | null }
 ): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('appointments')
     .update(fields)
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
 
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('No se actualizó el registro. Verifica permisos o recarga la página.');
+  }
 }
 
 export interface LeadEditFields {
@@ -77,12 +81,16 @@ export interface LeadEditFields {
 }
 
 export async function archiveAppointment(id: string, archived: boolean): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('appointments')
     .update({ archived })
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
 
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('No se pudo archivar el registro.');
+  }
 }
 
 export async function updateAppointmentLead(
@@ -93,7 +101,7 @@ export async function updateAppointmentLead(
   const phoneKey = 'whatsapp' in currentFormData ? 'whatsapp' : 'telefono';
   const newFormData = { ...currentFormData, [phoneKey]: fields.phone };
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('appointments')
     .update({
       lead_name: fields.lead_name,
@@ -105,9 +113,13 @@ export async function updateAppointmentLead(
       assigned_commercial_name: fields.assigned_commercial_name,
       form_data: newFormData,
     })
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
 
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('No se actualizó el lead. Verifica permisos o recarga la página.');
+  }
 }
 
 /** Obtiene la lista de comerciales asignables al pipeline de un booking */
