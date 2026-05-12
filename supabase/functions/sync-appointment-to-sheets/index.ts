@@ -20,12 +20,12 @@ const COUNTRY_NAMES: Record<string, string> = {
   HN: 'Honduras',
 };
 
-// id is first column so UPDATE can find rows by UUID
+// id va al final para no desplazar las columnas visibles
 const SHEET_HEADERS = [
-  'id',
   'Fecha', 'Chat', 'Comercial', 'Nombre del cliente', 'Numero del cliente',
   'Ventas Realizadas', 'Numero de anuncio', 'Tipo de Cliente',
   'Monto de la venta', 'Estado de cliente',
+  'id',
 ];
 
 // ── Google Service Account JWT + token ──────────────────────────────────────
@@ -154,22 +154,23 @@ function colLetter(n: number): string {
   return letter;
 }
 
-// Searches column A for the appointment UUID. Returns 1-based row number or null.
+// Searches the id column (last column) for the appointment UUID. Returns 1-based row number or null.
 async function findRowById(
   token: string,
   sheetId: string,
   tab: string,
   appointmentId: string,
 ): Promise<number | null> {
+  const idCol = colLetter(SHEET_HEADERS.length); // columna K (la última)
   const url =
     `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/` +
-    `${encodeURIComponent(tab)}!A:A`;
+    `${encodeURIComponent(tab)}!${idCol}:${idCol}`;
   const res = await sheetsRequest(token, 'GET', url);
   if (!res.ok) return null;
   const data = await res.json();
   const values: string[][] = data.values ?? [];
   for (let i = 1; i < values.length; i++) {
-    if (values[i][0] === appointmentId) return i + 1;
+    if (values[i]?.[0] === appointmentId) return i + 1;
   }
   return null;
 }
@@ -206,7 +207,6 @@ function buildRow(
 ): string[] {
   const fd: Record<string, string> = appt.form_data ?? {};
   return [
-    appt.id ?? '',
     appt.appointment_date ?? '',
     '',
     assignedUser,
@@ -217,6 +217,7 @@ function buildRow(
     appt.crm_tipo_cliente ?? '',
     appt.crm_monto_venta != null ? String(appt.crm_monto_venta) : '',
     appt.crm_estado_cliente ?? '',
+    appt.id ?? '', // id al final (columna K) para lookup en UPDATEs
   ];
 }
 
