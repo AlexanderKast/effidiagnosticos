@@ -211,7 +211,7 @@ function buildRow(
     '',
     assignedUser,
     appt.lead_name ?? '',
-    fd.whatsapp ?? '',
+    fd.whatsapp ?? fd.telefono ?? '',
     appt.crm_venta_realizada ? 'SI' : 'NO',
     appt.crm_canal_origen ?? '',
     appt.crm_tipo_cliente ?? '',
@@ -244,7 +244,8 @@ Deno.serve(async (req) => {
       .eq('booking_id', appt.booking_id)
       .single();
 
-    let assignedUser = '';
+    // Fallback: assigned_commercial_name ya viene guardado en el appointment (creación manual)
+    let assignedUser = appt.assigned_commercial_name ?? '';
     let assignedCalendarId = bc?.gcal_calendar_id || '';
     let commercialId = '';
 
