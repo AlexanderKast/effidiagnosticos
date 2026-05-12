@@ -1,5 +1,54 @@
 // Types for the booking system
 
+// ── Roles RBAC ──────────────────────────────────────────────────────────────
+
+export type AppRole =
+  | 'root'
+  | 'admin'
+  | 'lider_area'
+  | 'lider_comercial_pais'
+  | 'lider_comercial'
+  | 'comercial'
+  | 'setter'
+  | 'closer'
+  | 'user';
+
+export const ROLE_LEVEL: Record<AppRole, number> = {
+  root: 7,
+  admin: 6,
+  lider_area: 5,
+  lider_comercial_pais: 4,
+  lider_comercial: 3,
+  comercial: 2,
+  setter: 2,
+  closer: 2,
+  user: 1,
+};
+
+export const ROLE_LABELS: Record<AppRole, string> = {
+  root: 'Super Admin',
+  admin: 'Administrador',
+  lider_area: 'Líder de Área',
+  lider_comercial_pais: 'Líder Comercial País',
+  lider_comercial: 'Líder Comercial',
+  comercial: 'Comercial',
+  setter: 'Setter',
+  closer: 'Closer',
+  user: 'Usuario',
+};
+
+export function canReassignCommercial(role: AppRole | null): boolean {
+  return role ? ROLE_LEVEL[role] >= 3 : false;
+}
+
+export function isLeaderRole(role: AppRole | null): boolean {
+  return role ? ROLE_LEVEL[role] >= 3 : false;
+}
+
+export function isAdminRole(role: AppRole | null): boolean {
+  return role ? ROLE_LEVEL[role] >= 6 : false;
+}
+
 export interface BookingBulletPoint {
   id: string;
   text: string;
@@ -129,13 +178,16 @@ export interface BookingConfig {
   // Tracking pixels
   trackingPixels: TrackingPixel[];
 
+  // Meeting
+  meeting_link: string | null;
+
+  // CRM Pipeline
+  crm_pipeline_id: string | null;
+
   // Assignment
   assignment_type: 'individual' | 'group';
   gcal_calendar_id: string;
   commercial_group_id: string | null;
-
-  // Backend config
-  use_supabase_backend: boolean;
 
   // Status
   active: boolean;
@@ -203,10 +255,11 @@ export const createDefaultBooking = (partial?: Partial<BookingConfig>): BookingC
   requirePolicyAcceptance: true,
   formFields: defaultFormFields,
   trackingPixels: [],
+  meeting_link: null,
+  crm_pipeline_id: null,
   assignment_type: 'individual',
   gcal_calendar_id: 'primary',
   commercial_group_id: null,
-  use_supabase_backend: true,
   active: true,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),

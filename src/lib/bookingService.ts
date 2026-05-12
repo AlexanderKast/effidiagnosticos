@@ -18,10 +18,11 @@ const dbToBookingConfig = (row: any): BookingConfig => ({
   requirePolicyAcceptance: row.require_policy_acceptance ?? true,
   formFields: (row.form_fields as FormField[]) || defaultFormFields,
   trackingPixels: (row.tracking_pixels as TrackingPixel[]) || [],
+  meeting_link: row.meeting_link ?? null,
+  crm_pipeline_id: row.crm_pipeline_id ?? null,
   assignment_type: row.assignment_type ?? 'individual',
   gcal_calendar_id: row.gcal_calendar_id ?? 'primary',
   commercial_group_id: row.commercial_group_id ?? null,
-  use_supabase_backend: row.use_supabase_backend ?? true,
   active: row.active ?? true,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -44,6 +45,8 @@ const bookingConfigToDb = (booking: BookingConfig) => ({
   require_policy_acceptance: booking.requirePolicyAcceptance,
   form_fields: JSON.parse(JSON.stringify(booking.formFields)),
   tracking_pixels: JSON.parse(JSON.stringify(booking.trackingPixels || [])),
+  meeting_link: booking.meeting_link ?? null,
+  crm_pipeline_id: booking.crm_pipeline_id ?? null,
   assignment_type: booking.assignment_type,
   gcal_calendar_id: booking.gcal_calendar_id,
   commercial_group_id: booking.commercial_group_id,
@@ -135,10 +138,11 @@ export const updateBookingConfig = async (bookingId: string, updates: Partial<Bo
   if (updates.requirePolicyAcceptance !== undefined) updateData.require_policy_acceptance = updates.requirePolicyAcceptance;
   if (updates.formFields !== undefined) updateData.form_fields = updates.formFields;
   if (updates.trackingPixels !== undefined) updateData.tracking_pixels = updates.trackingPixels;
+  if (updates.meeting_link !== undefined) updateData.meeting_link = updates.meeting_link;
+  if (updates.crm_pipeline_id !== undefined) updateData.crm_pipeline_id = updates.crm_pipeline_id;
   if (updates.assignment_type !== undefined) updateData.assignment_type = updates.assignment_type;
   if (updates.gcal_calendar_id !== undefined) updateData.gcal_calendar_id = updates.gcal_calendar_id;
   if (updates.commercial_group_id !== undefined) updateData.commercial_group_id = updates.commercial_group_id;
-  if (updates.use_supabase_backend !== undefined) updateData.use_supabase_backend = updates.use_supabase_backend;
   if (updates.active !== undefined) updateData.active = updates.active;
 
   const { data, error } = await supabase
@@ -176,6 +180,20 @@ export const toggleBookingConfigStatus = async (bookingId: string): Promise<Book
   if (!current) throw new Error('Booking not found');
 
   return updateBookingConfig(bookingId, { active: !current.active });
+};
+
+// Duplicate a booking with a new ID
+export const duplicateBookingConfig = async (original: BookingConfig): Promise<BookingConfig> => {
+  const suffix = Date.now().toString(36).slice(-4);
+  const newBooking: BookingConfig = {
+    ...original,
+    booking_id: `${original.booking_id}-${suffix}`,
+    name: `Copia de ${original.name}`,
+    active: false,
+    createdAt: undefined,
+    updatedAt: undefined,
+  };
+  return createBookingConfig(newBooking);
 };
 
 // Check if booking_id is unique

@@ -136,30 +136,26 @@ export default function BookingPage() {
     const fecha = format(date, 'yyyy-MM-dd');
 
     try {
-      // Route: Edge Function (new) vs N8N (legacy)
-      if (booking.use_supabase_backend) {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-        const response = await fetch(`${supabaseUrl}/functions/v1/validate-availability`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${anonKey}`,
-          },
-          body: JSON.stringify({ booking_id: booking.booking_id, fecha }),
-        });
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const response = await fetch(`${supabaseUrl}/functions/v1/validate-availability`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${anonKey}`,
+        },
+        body: JSON.stringify({ booking_id: booking.booking_id, fecha }),
+      });
 
-        if (response.ok) {
-          const { data } = await response.json();
-          const available = (data.slots as Array<{ time: string; available: boolean }>)
-            .filter(s => s.available)
-            .map(s => s.time);
-          setAvailableSlots(available);
-          return;
-        }
+      if (response.ok) {
+        const { data } = await response.json();
+        const available = (data.slots as Array<{ time: string; available: boolean }>)
+          .filter(s => s.available)
+          .map(s => s.time);
+        setAvailableSlots(available);
+      } else {
+        setAvailableSlots([]);
       }
-
-      setAvailableSlots([]);
     } catch (error) {
       console.error('Error fetching availability:', error);
       setAvailableSlots(['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
@@ -276,47 +272,44 @@ export default function BookingPage() {
         ...formDataWithLabels,
       };
 
-      if (booking.use_supabase_backend) {
-        // Edge Function path (nuevo backend sin N8N)
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-        const response = await fetch(`${supabaseUrl}/functions/v1/create-booking`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${anonKey}`,
-          },
-          body: JSON.stringify({
-            booking_id: booking.booking_id,
-            fecha,
-            hora: selectedTime,
-            form_data: formDataWithLabels,
-            name: formData.name,
-            email: formData.email,
-            company: formData.company,
-            notes: formData.notes,
-          }),
-        });
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const response = await fetch(`${supabaseUrl}/functions/v1/create-booking`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${anonKey}`,
+        },
+        body: JSON.stringify({
+          booking_id: booking.booking_id,
+          fecha,
+          hora: selectedTime,
+          form_data: formDataWithLabels,
+          name: formData.name,
+          email: formData.email,
+          company: formData.company,
+          notes: formData.notes,
+        }),
+      });
 
-        const result = await response.json();
+      const result = await response.json();
 
-        if (!response.ok || !result.success) {
-          throw new Error(result.error ?? 'Error al crear la cita');
-        }
-
-        trackEvent('booking_complete', { date: fecha, time: selectedTime, booking_name: booking.name });
-        navigate('/confirmacion', {
-          state: {
-            webhookResponse: result.data,
-            bookingDetails: {
-              ...bookingDetails,
-              gcal_link: result.data?.gcal_link,
-              commercial_name: result.data?.assigned_commercial?.name,
-              meeting_link: result.data?.assigned_commercial?.meeting_link,
-            },
-          },
-        });
+      if (!response.ok || !result.success) {
+        throw new Error(result.error ?? 'Error al crear la cita');
       }
+
+      trackEvent('booking_complete', { date: fecha, time: selectedTime, booking_name: booking.name });
+      navigate('/confirmacion', {
+        state: {
+          webhookResponse: result.data,
+          bookingDetails: {
+            ...bookingDetails,
+            gcal_link: result.data?.gcal_link,
+            commercial_name: result.data?.assigned_commercial?.name,
+            meeting_link: result.data?.assigned_commercial?.meeting_link,
+          },
+        },
+      });
     } catch (error) {
       console.error('Error submitting booking:', error);
       navigate('/confirmacion', {

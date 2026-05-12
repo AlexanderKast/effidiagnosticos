@@ -532,6 +532,7 @@ Deno.serve(async (req) => {
         .from('appointments')
         .insert({
           booking_id,
+          crm_pipeline_id: (config.crm_pipeline_id as string | null) ?? null,
           lead_name: leadName,
           lead_email: leadEmail,
           lead_company: leadCompany || null,
@@ -581,6 +582,9 @@ Deno.serve(async (req) => {
       // -----------------------------------------------------------------------
       const gcalCalendarId = assignedCommercial?.calendar_id ?? (config.gcal_calendar_id as string) ?? 'primary'
 
+      // Booking-level link takes priority over commercial-level link
+      const meetingLink = (config.meeting_link as string | null) ?? assignedCommercial?.meeting_link ?? null
+
       const gcalResult = await syncToGoogleCalendar({
         appointmentId: appointment.id,
         config,
@@ -588,7 +592,7 @@ Deno.serve(async (req) => {
         leadName,
         leadEmail,
         formData: form_data,
-        meetingLink: assignedCommercial?.meeting_link ?? null,
+        meetingLink,
         fecha,
         hora,
         endTime,
@@ -615,7 +619,7 @@ Deno.serve(async (req) => {
                   id: assignedCommercial.id,
                   name: assignedCommercial.name,
                   email: assignedCommercial.email,
-                  meeting_link: assignedCommercial.meeting_link,
+                  meeting_link: meetingLink,
                 }
               : null,
             gcal_link: gcalResult?.htmlLink ?? null,

@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Loader2, ArrowLeft } from 'lucide-react';
+import { Calendar, Loader2, ArrowLeft, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -18,17 +19,48 @@ export default function AuthPage() {
   const navigate = useNavigate();
   const { signIn, signUp, isLoading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  
+
+  // Detectar hash sincrónicamente antes de que Supabase lo limpie (fallback)
+  const [mode, setMode] = useState<'normal' | 'set-password'>(() => {
+    const params = new URLSearchParams(window.location.hash.substring(1));
+    const type = params.get('type');
+    return type === 'invite' || type === 'recovery' ? 'set-password' : 'normal';
+  });
+
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginErrors, setLoginErrors] = useState<{ email?: string; password?: string }>({});
-  
+
   // Signup form state
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [signupName, setSignupName] = useState('');
   const [signupErrors, setSignupErrors] = useState<{ email?: string; password?: string; name?: string }>({});
+
+  // Set-password form state (flujo de invitación)
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [inviteName, setInviteName] = useState('');
+
+  // Detectar invitación: hash (si no fue limpiado aún) o user_metadata flag
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setMode('set-password');
+        return;
+      }
+      // Invitados: Supabase dispara SIGNED_IN pero no PASSWORD_RECOVERY
+      // El flag needs_password_set se graba en user_metadata al invitar
+      if (
+        event === 'SIGNED_IN' &&
+        session?.user?.user_metadata?.needs_password_set === true
+      ) {
+        setMode('set-password');
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const validateLogin = () => {
     const errors: { email?: string; password?: string } = {};
@@ -118,10 +150,109 @@ export default function AuthPage() {
     navigate('/');
   };
 
+  const handleSetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      toast.error('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Las contraseñas no coinciden');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      // Guardar contraseña y limpiar flag de invitación en un solo call
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+        data: { needs_password_set: false },
+      });
+      if (error) throw error;
+
+      // Actualizar nombre si lo ingresó
+      if (inviteName.trim()) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from('profiles').update({ full_name: inviteName.trim() }).eq('user_id', user.id);
+        }
+      }
+
+      toast.success('¡Contraseña creada! Bienvenido al equipo.');
+      navigate('/admin/crm');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error al crear contraseña';
+      toast.error(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Pantalla de invitación — crear contraseña
+  if (mode === 'set-password') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="w-full max-w-md">
+          <Card>
+            <CardHeader className="text-center">
+              <div className="mx-auto w-12 h-12 bg-primary rounded-xl flex items-center justify-center mb-4">
+                <KeyRound className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <CardTitle>Crea tu contraseña</CardTitle>
+              <CardDescription>
+                Fuiste invitado al equipo. Elige una contraseña para acceder.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSetPassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="invite-name">Tu nombre completo</Label>
+                  <Input
+                    id="invite-name"
+                    type="text"
+                    value={inviteName}
+                    onChange={(e) => setInviteName(e.target.value)}
+                    placeholder="¿Cómo te llamas?"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">Contraseña</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Mínimo 6 caracteres"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">Confirmar contraseña</Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Repite tu contraseña"
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</>
+                  ) : (
+                    'Entrar al equipo'
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }

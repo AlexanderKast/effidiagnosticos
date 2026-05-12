@@ -17,7 +17,7 @@ export type Database = {
       appointments: {
         Row: {
           id: string
-          booking_id: string
+          booking_id: string | null
           lead_name: string
           lead_email: string
           lead_company: string | null
@@ -56,7 +56,7 @@ export type Database = {
         }
         Insert: {
           id?: string
-          booking_id: string
+          booking_id?: string | null
           lead_name: string
           lead_email: string
           lead_company?: string | null
@@ -142,6 +142,33 @@ export type Database = {
           }
         ]
       }
+      crm_pipelines: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          color: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          color?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          color?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       booking_configs: {
         Row: {
           active: boolean
@@ -154,10 +181,10 @@ export type Database = {
           duration: number
           expectations: Json
           form_fields: Json
+          crm_pipeline_id: string | null
           gcal_calendar_id: string
           id: string
-          n8n_create_booking_url: string
-          n8n_get_availability_url: string
+          meeting_link: string | null
           name: string
           not_for: Json
           policy_text: string
@@ -168,7 +195,6 @@ export type Database = {
           topics: Json
           tracking_pixels: Json | null
           updated_at: string
-          use_supabase_backend: boolean
         }
         Insert: {
           active?: boolean
@@ -181,10 +207,10 @@ export type Database = {
           duration?: number
           expectations?: Json
           form_fields?: Json
+          crm_pipeline_id?: string | null
           gcal_calendar_id?: string
           id?: string
-          n8n_create_booking_url?: string
-          n8n_get_availability_url?: string
+          meeting_link?: string | null
           name: string
           not_for?: Json
           policy_text?: string
@@ -195,7 +221,6 @@ export type Database = {
           topics?: Json
           tracking_pixels?: Json | null
           updated_at?: string
-          use_supabase_backend?: boolean
         }
         Update: {
           active?: boolean
@@ -208,10 +233,10 @@ export type Database = {
           duration?: number
           expectations?: Json
           form_fields?: Json
+          crm_pipeline_id?: string | null
           gcal_calendar_id?: string
           id?: string
-          n8n_create_booking_url?: string
-          n8n_get_availability_url?: string
+          meeting_link?: string | null
           name?: string
           not_for?: Json
           policy_text?: string
@@ -222,7 +247,6 @@ export type Database = {
           topics?: Json
           tracking_pixels?: Json | null
           updated_at?: string
-          use_supabase_backend?: boolean
         }
         Relationships: []
       }
@@ -259,18 +283,69 @@ export type Database = {
           id: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
+          reports_to: string | null
+          country: string | null
+          area: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id: string
+          reports_to?: string | null
+          country?: string | null
+          area?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+          reports_to?: string | null
+          country?: string | null
+          area?: string | null
+        }
+        Relationships: []
+      }
+      commercial_calendars: {
+        Row: {
+          id: string
+          commercial_id: number | null
+          name: string
+          email: string
+          calendar_id: string
+          status: string
+          empresa: string | null
+          country: string
+          user_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          commercial_id?: number | null
+          name: string
+          email: string
+          calendar_id: string
+          status?: string
+          empresa?: string | null
+          country?: string
+          user_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          commercial_id?: number | null
+          name?: string
+          email?: string
+          calendar_id?: string
+          status?: string
+          empresa?: string | null
+          country?: string
+          user_id?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -286,9 +361,21 @@ export type Database = {
         }
         Returns: boolean
       }
+      get_user_role: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      can_view_appointment: {
+        Args: { _assigned_commercial_id: string | null }
+        Returns: boolean
+      }
+      can_reassign_commercial: {
+        Args: Record<never, never>
+        Returns: boolean
+      }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "root" | "lider_area" | "lider_comercial_pais" | "lider_comercial" | "comercial" | "setter" | "closer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -416,7 +503,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "root", "lider_area", "lider_comercial_pais", "lider_comercial", "comercial", "setter", "closer"],
     },
   },
 } as const

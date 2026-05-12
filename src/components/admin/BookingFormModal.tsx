@@ -12,6 +12,7 @@ import {
   CommercialGroup,
   fetchGroups,
 } from '@/lib/commercialGroupsService';
+import { CRMPipeline, fetchPipelines, createPipeline, PIPELINE_COLORS } from '@/lib/crmPipelinesService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,7 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Loader2 } from 'lucide-react';
 import { FormFieldsEditor } from './FormFieldsEditor';
 import { TrackingPixelsEditor } from './TrackingPixelsEditor';
 
@@ -66,10 +67,16 @@ export function BookingFormModal({
   const [isValidating, setIsValidating] = useState(false);
   const [commercials, setCommercials] = useState<CommercialCalendar[]>([]);
   const [groups, setGroups] = useState<CommercialGroup[]>([]);
+  const [pipelines, setPipelines] = useState<CRMPipeline[]>([]);
+  const [newPipelineOpen, setNewPipelineOpen] = useState(false);
+  const [newPipelineName, setNewPipelineName] = useState('');
+  const [newPipelineColor, setNewPipelineColor] = useState(PIPELINE_COLORS[0]);
+  const [newPipelineLoading, setNewPipelineLoading] = useState(false);
 
   useEffect(() => {
     fetchCommercialCalendars(true).then(setCommercials).catch(() => {});
     fetchGroups().then(setGroups).catch(() => {});
+    fetchPipelines().then(setPipelines).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -145,6 +152,22 @@ export function BookingFormModal({
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handleCreatePipeline = async () => {
+    if (!newPipelineName.trim()) return;
+    setNewPipelineLoading(true);
+    try {
+      const created = await createPipeline({ name: newPipelineName.trim(), color: newPipelineColor });
+      const updated = await fetchPipelines();
+      setPipelines(updated);
+      updateField('crm_pipeline_id', created.id);
+      setNewPipelineOpen(false);
+    } catch {
+      // error silencioso — el usuario puede reintentar
+    } finally {
+      setNewPipelineLoading(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -262,13 +285,27 @@ export function BookingFormModal({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="country">País / Región</Label>
-                <Input
-                  id="country"
+                <Label>País / Región</Label>
+                <Select
                   value={formData.country}
-                  onChange={(e) => updateField('country', e.target.value)}
-                  placeholder="Colombia, LATAM, etc."
-                />
+                  onValueChange={(v) => updateField('country', v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar país" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CO">🇨🇴 Colombia</SelectItem>
+                    <SelectItem value="MX">🇲🇽 México</SelectItem>
+                    <SelectItem value="GT">🇬🇹 Guatemala</SelectItem>
+                    <SelectItem value="CR">🇨🇷 Costa Rica</SelectItem>
+                    <SelectItem value="DO">🇩🇴 República Dominicana</SelectItem>
+                    <SelectItem value="EC">🇪🇨 Ecuador</SelectItem>
+                    <SelectItem value="PE">🇵🇪 Perú</SelectItem>
+                    <SelectItem value="CL">🇨🇱 Chile</SelectItem>
+                    <SelectItem value="AR">🇦🇷 Argentina</SelectItem>
+                    <SelectItem value="LATAM">🌎 LATAM</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -378,7 +415,6 @@ export function BookingFormModal({
                   onValueChange={(calId) => {
                     updateField('gcal_calendar_id', calId);
                     updateField('commercial_group_id', null);
-                    updateField('use_supabase_backend', true);
                   }}
                 >
                   <SelectTrigger>
@@ -409,7 +445,6 @@ export function BookingFormModal({
                   onValueChange={(groupId) => {
                     updateField('commercial_group_id', groupId);
                     updateField('gcal_calendar_id', 'primary');
-                    updateField('use_supabase_backend', true);
                   }}
                 >
                   <SelectTrigger>
@@ -434,6 +469,109 @@ export function BookingFormModal({
                 </p>
               </div>
             )}
+
+            {/* Pipeline CRM */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Pipeline CRM</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                  onClick={() => { setNewPipelineName(''); setNewPipelineColor(PIPELINE_COLORS[0]); setNewPipelineOpen(true); }}
+                >
+                  <Plus className="w-3 h-3" />
+                  Crear pipeline
+                </Button>
+              </div>
+              <Select
+                value={formData.crm_pipeline_id ?? '__none__'}
+                onValueChange={(v) => updateField('crm_pipeline_id', v === '__none__' ? null : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sin pipeline asignado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin pipeline asignado</SelectItem>
+                  {pipelines.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: p.color }}
+                        />
+                        {p.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Los leads de este booking irán a este pipeline CRM.
+              </p>
+            </div>
+
+            {/* Mini-dialog: crear pipeline rápido */}
+            <Dialog open={newPipelineOpen} onOpenChange={setNewPipelineOpen}>
+              <DialogContent className="max-w-sm">
+                <DialogHeader>
+                  <DialogTitle>Nuevo pipeline</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div className="space-y-1.5">
+                    <Label>Nombre</Label>
+                    <Input
+                      placeholder="ej: Leads Colombia"
+                      value={newPipelineName}
+                      onChange={(e) => setNewPipelineName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleCreatePipeline()}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Color</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {PIPELINE_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setNewPipelineColor(c)}
+                          className="w-7 h-7 rounded-full border-2 transition-all"
+                          style={{
+                            backgroundColor: c,
+                            borderColor: newPipelineColor === c ? '#000' : 'transparent',
+                            outline: newPipelineColor === c ? '2px solid white' : 'none',
+                            outlineOffset: '-3px',
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setNewPipelineOpen(false)} disabled={newPipelineLoading}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleCreatePipeline} disabled={newPipelineLoading || !newPipelineName.trim()}>
+                    {newPipelineLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Crear
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <div className="space-y-2">
+              <Label htmlFor="meeting_link">Link de reunión (Zoom)</Label>
+              <Input
+                id="meeting_link"
+                value={formData.meeting_link ?? ''}
+                onChange={(e) => updateField('meeting_link', e.target.value || null)}
+                placeholder="https://zoom.us/j/..."
+              />
+              <p className="text-xs text-muted-foreground">
+                Si se deja vacío, se usará el link del comercial asignado.
+              </p>
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="policyText">Texto de política de datos</Label>

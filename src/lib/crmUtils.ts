@@ -106,7 +106,8 @@ export interface CRMFields {
 
 export interface AppointmentCRM extends CRMFields {
   id: string;
-  booking_id: string;
+  booking_id: string | null;
+  crm_pipeline_id: string | null;
   lead_name: string;
   lead_email: string;
   lead_company: string | null;

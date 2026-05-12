@@ -11,6 +11,7 @@ import AdminPage from "./pages/AdminPage";
 import AuthPage from "./pages/AuthPage";
 import CRMPage from "./pages/CRMPage";
 import NotFound from "./pages/NotFound";
+import AdminLayout from "./components/admin/AdminLayout";
 
 const queryClient = new QueryClient();
 
@@ -23,16 +24,16 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
-            {/* Auth page for admin login */}
             <Route path="/auth" element={<AuthPage />} />
-            {/* Dynamic booking pages - each booking_id renders its own landing */}
             <Route path="/booking/:bookingId" element={<BookingPage />} />
-            {/* Legacy route support */}
             <Route path="/agenda/:bookingId" element={<BookingPage />} />
             <Route path="/confirmacion" element={<ConfirmationPage />} />
-            <Route path="/admin" element={<AdminPage />} />
-            <Route path="/admin/crm/:bookingId" element={<CRMPage />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            {/* Admin routes — sidebar compartido */}
+            <Route element={<AdminLayout />}>
+              <Route path="/admin" element={<AdminPage />} />
+              <Route path="/admin/crm" element={<CRMPage />} />
+              <Route path="/admin/crm/:bookingId" element={<CRMPage />} />
+            </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

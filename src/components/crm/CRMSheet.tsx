@@ -47,9 +47,10 @@ interface CRMSheetProps {
   onUpdated: (id: string, fields: Partial<AppointmentCRM>) => void;
   onArchived: (id: string) => void;
   commercials: CommercialOption[];
+  canReassign?: boolean;
 }
 
-export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchived, commercials }: CRMSheetProps) {
+export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchived, commercials, canReassign = false }: CRMSheetProps) {
   const [saving, setSaving] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [savingLead, setSavingLead] = useState(false);
@@ -87,7 +88,7 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchive
       const key = Object.keys(fields)[0];
       setSaving(key);
       try {
-        await updateAppointmentCRM(appointment.id, fields);
+        await updateAppointmentCRM(appointment.id, fields, canReassign);
         onUpdated(appointment.id, fields as Partial<AppointmentCRM>);
       } catch (err) {
         console.error('[CRMSheet] save error:', err);
@@ -96,7 +97,7 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchive
         setSaving(null);
       }
     },
-    [appointment, onUpdated]
+    [appointment, onUpdated, canReassign]
   );
 
   useEffect(() => {
@@ -157,7 +158,9 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchive
     if (!appointment) return;
     setSavingLead(true);
     try {
-      const selectedCommercial = commercials.find((c) => c.id === editForm.commercial_id) ?? null;
+      const selectedCommercial = canReassign
+        ? (commercials.find((c) => c.id === editForm.commercial_id) ?? null)
+        : null;
       const fields = {
         lead_name: editForm.lead_name.trim(),
         lead_email: editForm.lead_email.trim(),
@@ -165,8 +168,12 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchive
         appointment_date: editForm.appointment_date,
         start_time: editForm.start_time,
         phone: editForm.phone.trim(),
-        assigned_commercial_id: selectedCommercial?.id ?? null,
-        assigned_commercial_name: selectedCommercial?.name ?? null,
+        assigned_commercial_id: canReassign
+          ? (selectedCommercial?.id ?? null)
+          : (appointment.assigned_commercial_id ?? null),
+        assigned_commercial_name: canReassign
+          ? (selectedCommercial?.name ?? null)
+          : (appointment.assigned_commercial_name ?? null),
       };
       await updateAppointmentLead(appointment.id, fields, appointment.form_data);
       onUpdated(appointment.id, {
@@ -282,7 +289,7 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchive
                 />
               </div>
             </div>
-            {commercials.length > 0 && (
+            {canReassign && commercials.length > 0 && (
               <div className="space-y-1.5">
                 <Label>Comercial asignado</Label>
                 <Select

@@ -14,24 +14,32 @@ export interface CRMFilters {
   verArchivados?: boolean;
 }
 
-export async function fetchAppointmentsByBooking(
-  bookingId: string,
-  filters: CRMFilters = {}
+export async function fetchCRMRecords(
+  filters: CRMFilters & { bookingId?: string; pipelineId?: string | null } = {}
 ): Promise<AppointmentCRM[]> {
   let query = supabase
     .from('appointments')
     .select(`
-      id, booking_id, lead_name, lead_email, lead_company, lead_notes,
+      id, booking_id, crm_pipeline_id, lead_name, lead_email, lead_company, lead_notes,
       form_data, appointment_date, start_time, end_time, status,
       assigned_commercial_id, assigned_commercial_name, created_at, archived,
       gcal_event_id, gcal_html_link,
       crm_venta_realizada, crm_tipo_marketing, crm_tipo_cliente,
       crm_monto_venta, crm_estado_cliente, crm_observaciones, crm_canal_origen
     `)
-    .eq('booking_id', bookingId)
     .eq('archived', filters.verArchivados ? true : false)
     .order('appointment_date', { ascending: false })
     .order('start_time', { ascending: false });
+
+  if (filters.pipelineId === '__none__') {
+    query = query.is('crm_pipeline_id', null);
+  } else if (filters.pipelineId) {
+    query = query.eq('crm_pipeline_id', filters.pipelineId);
+  }
+
+  if (filters.bookingId) {
+    query = query.eq('booking_id', filters.bookingId);
+  }
 
   if (filters.estado) {
     query = query.eq('crm_estado_cliente', filters.estado);
@@ -55,8 +63,14 @@ export async function fetchAppointmentsByBooking(
 
 export async function updateAppointmentCRM(
   id: string,
-  fields: Partial<CRMFields> & { assigned_commercial_id?: string | null; assigned_commercial_name?: string | null }
+  fields: Partial<CRMFields> & { assigned_commercial_id?: string | null; assigned_commercial_name?: string | null },
+  canReassign = false
 ): Promise<void> {
+  // Protección en capa de aplicación: solo líderes pueden reasignar
+  if (!canReassign) {
+    delete (fields as Record<string, unknown>).assigned_commercial_id;
+    delete (fields as Record<string, unknown>).assigned_commercial_name;
+  }
   const { data, error } = await supabase
     .from('appointments')
     .update(fields)

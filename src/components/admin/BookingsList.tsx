@@ -16,7 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ExternalLink, Copy, Check, MoreVertical, Pencil, Trash2, Clock, MapPin, BarChart2 } from 'lucide-react';
+import { ExternalLink, Copy, Check, MoreVertical, Pencil, Trash2, Clock, MapPin, BarChart2, CopyPlus } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -25,9 +25,10 @@ interface BookingsListProps {
   onEdit: (booking: BookingConfig) => void;
   onDelete: (bookingId: string) => void;
   onToggleStatus: (bookingId: string) => void;
+  onDuplicate: (booking: BookingConfig) => void;
 }
 
-export function BookingsList({ bookings, onEdit, onDelete, onToggleStatus }: BookingsListProps) {
+export function BookingsList({ bookings, onEdit, onDelete, onToggleStatus, onDuplicate }: BookingsListProps) {
   const navigate = useNavigate();
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -61,7 +62,6 @@ export function BookingsList({ bookings, onEdit, onDelete, onToggleStatus }: Boo
             <TableHead>Booking</TableHead>
             <TableHead>Área</TableHead>
             <TableHead>Detalles</TableHead>
-            <TableHead>n8n</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead className="text-right">Acciones</TableHead>
           </TableRow>
@@ -91,17 +91,6 @@ export function BookingsList({ bookings, onEdit, onDelete, onToggleStatus }: Boo
                   <Clock className="w-4 h-4" />
                   {booking.duration} min
                 </div>
-              </TableCell>
-              <TableCell>
-                {booking.n8n_get_availability_url || booking.n8n_create_booking_url ? (
-                  <Badge variant="outline" className="text-success border-success/30 bg-success/10">
-                    Configurado
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="text-muted-foreground">
-                    Demo mode
-                  </Badge>
-                )}
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
@@ -157,6 +146,10 @@ export function BookingsList({ bookings, onEdit, onDelete, onToggleStatus }: Boo
                       <DropdownMenuItem onClick={() => onEdit(booking)}>
                         <Pencil className="w-4 h-4 mr-2" />
                         Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onDuplicate(booking)}>
+                        <CopyPlus className="w-4 h-4 mr-2" />
+                        Duplicar
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => onDelete(booking.booking_id)}

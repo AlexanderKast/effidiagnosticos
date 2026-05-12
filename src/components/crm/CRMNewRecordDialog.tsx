@@ -20,6 +20,9 @@ import { Loader2 } from 'lucide-react';
 import { PhoneInput } from '@/components/ui/PhoneInput';
 import { supabase } from '@/integrations/supabase/client';
 import { CommercialOption } from '@/lib/crmService';
+import { CommercialProfile } from '@/hooks/useAuth';
+import { BookingConfig } from '@/lib/types';
+import { CRMPipeline } from '@/lib/crmPipelinesService';
 import { toast } from 'sonner';
 import {
   CRM_ESTADOS,
@@ -35,9 +38,14 @@ import {
 interface CRMNewRecordDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  bookingId: string;
+  bookingId: string | null;
+  bookings: BookingConfig[];
+  pipelines: CRMPipeline[];
+  selectedPipelineId: string | null;
   bookingCountry?: string;
   commercials: CommercialOption[];
+  canReassign?: boolean;
+  selfCommercial?: CommercialProfile | null;
   onCreated: (appointment: AppointmentCRM) => void;
 }
 
@@ -45,6 +53,8 @@ const EMPTY = {
   lead_name: '',
   phone: '',
   commercial_id: '',
+  selected_booking_id: '',
+  selected_pipeline_id: '',
   crm_canal_origen: '' as CRMCanalOrigen | '',
   crm_tipo_cliente: '' as CRMTipoCliente | '',
   crm_estado_cliente: '' as CRMEstado | '',
@@ -54,17 +64,37 @@ export function CRMNewRecordDialog({
   open,
   onOpenChange,
   bookingId,
+  bookings,
+  pipelines,
+  selectedPipelineId,
   bookingCountry = 'CO',
   commercials,
+  canReassign = true,
+  selfCommercial = null,
   onCreated,
 }: CRMNewRecordDialogProps) {
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState(EMPTY);
+  const [form, setForm] = useState({
+    ...EMPTY,
+    selected_booking_id: bookingId ?? '',
+    selected_pipeline_id: selectedPipelineId && selectedPipelineId !== '__none__' ? selectedPipelineId : '',
+  });
   const [nameError, setNameError] = useState('');
 
   const set = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     if (field === 'lead_name') setNameError('');
+  };
+
+  const handleOpen = (isOpen: boolean) => {
+    if (isOpen) {
+      setForm({
+        ...EMPTY,
+        selected_booking_id: bookingId ?? '',
+        selected_pipeline_id: selectedPipelineId && selectedPipelineId !== '__none__' ? selectedPipelineId : '',
+      });
+    }
+    onOpenChange(isOpen);
   };
 
   const handleSubmit = async () => {
@@ -74,12 +104,28 @@ export function CRMNewRecordDialog({
     }
     setSaving(true);
     try {
-      const selectedCommercial = commercials.find((c) => c.id === form.commercial_id) ?? null;
+      // Auto-asignar al comercial actual si no puede reasignar
+      let selectedCommercial: { id: string; name: string } | null = null;
+      if (canReassign) {
+        selectedCommercial = commercials.find((c) => c.id === form.commercial_id) ?? null;
+      } else if (selfCommercial) {
+        selectedCommercial = selfCommercial;
+      }
+      const finalBookingId = form.selected_booking_id || null;
+      const finalPipelineId = form.selected_pipeline_id || null;
+
+      // Si no se seleccionó pipeline manualmente, heredarlo del booking seleccionado
+      let resolvedPipelineId = finalPipelineId;
+      if (!resolvedPipelineId && finalBookingId) {
+        const booking = bookings.find((b) => b.booking_id === finalBookingId);
+        resolvedPipelineId = booking?.crm_pipeline_id ?? null;
+      }
 
       const { data, error } = await supabase
         .from('appointments')
         .insert({
-          booking_id: bookingId,
+          booking_id: finalBookingId,
+          crm_pipeline_id: resolvedPipelineId,
           lead_name: form.lead_name.trim(),
           lead_email: 'sin-email@manual.com',
           form_data: form.phone.trim() ? { telefono: form.phone.trim() } : {},
@@ -104,7 +150,6 @@ export function CRMNewRecordDialog({
 
       onCreated(data as AppointmentCRM);
       onOpenChange(false);
-      setForm(EMPTY);
       setNameError('');
     } catch (err) {
       console.error('[CRMNewRecordDialog] error:', err);
@@ -116,7 +161,7 @@ export function CRMNewRecordDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpen}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Nuevo registro</DialogTitle>
@@ -145,8 +190,54 @@ export function CRMNewRecordDialog({
             />
           </div>
 
-          {/* Comercial */}
-          {commercials.length > 0 && (
+          {/* Pipeline */}
+          <div className="space-y-1.5">
+            <Label>Pipeline CRM <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+            <Select
+              value={form.selected_pipeline_id || '__none__'}
+              onValueChange={(v) => set('selected_pipeline_id', v === '__none__' ? '' : v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sin pipeline" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Sin pipeline</SelectItem>
+                {pipelines.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: p.color }}
+                      />
+                      {p.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Booking (opcional) */}
+          <div className="space-y-1.5">
+            <Label>Booking asociado <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+            <Select
+              value={form.selected_booking_id || '__none__'}
+              onValueChange={(v) => set('selected_booking_id', v === '__none__' ? '' : v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sin booking asignado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Sin booking asignado</SelectItem>
+                {bookings.map((b) => (
+                  <SelectItem key={b.booking_id} value={b.booking_id}>{b.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Comercial: solo visible si puede reasignar */}
+          {canReassign && commercials.length > 0 && (
             <div className="space-y-1.5">
               <Label>Comercial</Label>
               <Select value={form.commercial_id} onValueChange={(v) => set('commercial_id', v)}>
@@ -159,6 +250,15 @@ export function CRMNewRecordDialog({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          )}
+          {/* Comercial auto-asignado (no editable) */}
+          {!canReassign && selfCommercial && (
+            <div className="space-y-1.5">
+              <Label>Comercial asignado</Label>
+              <p className="text-sm text-muted-foreground bg-muted rounded-md px-3 py-2">
+                {selfCommercial.name}
+              </p>
             </div>
           )}
 

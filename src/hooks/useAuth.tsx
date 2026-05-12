@@ -1,12 +1,22 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { AppRole, isAdminRole, canReassignCommercial, isLeaderRole } from '@/lib/types';
+
+export interface CommercialProfile {
+  id: string;
+  name: string;
+}
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   isLoading: boolean;
+  userRole: AppRole | null;
   isAdmin: boolean;
+  canReassign: boolean;
+  isLeader: boolean;
+  commercialProfile: CommercialProfile | null;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -18,61 +28,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [userRole, setUserRole] = useState<AppRole | null>(null);
+  const [commercialProfile, setCommercialProfile] = useState<CommercialProfile | null>(null);
 
-  // Check if user has admin role - query directly from user_roles table
-  const checkAdminRole = async (userId: string) => {
+  const checkUserData = async (userId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data: roleData } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userId)
-        .eq('role', 'admin')
         .maybeSingle();
-      
-      if (error) {
-        console.error('Error checking admin role:', error);
-        return false;
+
+      const role = (roleData?.role as AppRole) ?? null;
+      setUserRole(role);
+
+      // Cargar perfil comercial si el usuario tiene un rol de campo
+      let profile: CommercialProfile | null = null;
+      if (role && !isAdminRole(role)) {
+        const { data: cc } = await supabase
+          .from('commercial_calendars')
+          .select('id, name')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (cc) profile = { id: cc.id, name: cc.name };
       }
-      
-      return data !== null;
-    } catch (error) {
-      console.error('Error checking admin role:', error);
-      return false;
+      setCommercialProfile(profile);
+    } catch {
+      // silent - auth still works without role data
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
-        // Defer admin check with setTimeout to avoid deadlock
+
         if (session?.user) {
-          setTimeout(async () => {
-            const adminStatus = await checkAdminRole(session.user.id);
-            setIsAdmin(adminStatus);
-            setIsLoading(false);
-          }, 0);
+          setTimeout(() => checkUserData(session.user.id), 0);
         } else {
-          setIsAdmin(false);
+          setUserRole(null);
+          setCommercialProfile(null);
           setIsLoading(false);
         }
       }
     );
 
-    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
-        checkAdminRole(session.user.id).then((adminStatus) => {
-          setIsAdmin(adminStatus);
-          setIsLoading(false);
-        });
+        checkUserData(session.user.id);
       } else {
         setIsLoading(false);
       }
@@ -82,24 +91,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error };
   };
 
   const signUp = async (email: string, password: string, fullName?: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName,
-        },
+        emailRedirectTo: `${window.location.origin}/`,
+        data: { full_name: fullName },
       },
     });
     return { error };
@@ -107,7 +109,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    setIsAdmin(false);
+    setUserRole(null);
+    setCommercialProfile(null);
   };
 
   return (
@@ -115,7 +118,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       session,
       isLoading,
-      isAdmin,
+      userRole,
+      isAdmin: isAdminRole(userRole),
+      canReassign: canReassignCommercial(userRole),
+      isLeader: isLeaderRole(userRole),
+      commercialProfile,
       signIn,
       signUp,
       signOut,
