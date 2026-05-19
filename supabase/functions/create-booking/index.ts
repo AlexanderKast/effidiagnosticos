@@ -285,16 +285,10 @@ async function createGoogleCalendarEvent(params: {
         { method: 'popup', minutes: 30 },
       ],
     },
-    conferenceData: {
-      createRequest: {
-        requestId: crypto.randomUUID(),
-        conferenceSolutionKey: { type: 'hangoutsMeet' },
-      },
-    },
   }
 
   const resp = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(params.calendarId)}/events?conferenceDataVersion=1&sendUpdates=all`,
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(params.calendarId)}/events?sendUpdates=all`,
     {
       method: 'POST',
       headers: {
