@@ -125,6 +125,37 @@ export interface AppointmentCRM extends CRMFields {
   gcal_html_link: string | null;
 }
 
+// ── Duplicados ──────────────────────────────────────────────────────────────
+
+export type DuplicatesMap = Record<string, AppointmentCRM[]>;
+
+export interface MergeLeadsParams {
+  winner: AppointmentCRM;
+  losers: AppointmentCRM[];
+  assignCommercialId?: string | null;
+  assignCommercialName?: string | null;
+}
+
+export interface MergeLeadsResult {
+  updatedWinner: Partial<AppointmentCRM>;
+  archivedIds: string[];
+}
+
+export function buildDuplicatesMap(appointments: AppointmentCRM[]): DuplicatesMap {
+  const map: DuplicatesMap = {};
+  for (const appt of appointments) {
+    const email = appt.lead_email?.trim().toLowerCase();
+    if (!email) continue;
+    if (!map[email]) map[email] = [];
+    map[email].push(appt);
+  }
+  // solo conservar grupos con 2+ registros
+  for (const key of Object.keys(map)) {
+    if (map[key].length < 2) delete map[key];
+  }
+  return map;
+}
+
 const PHONE_CANDIDATES = [
   'phone', 'telefono', 'teléfono', 'tel', 'whatsapp',
   'celular', 'movil', 'móvil', 'numero', 'número', 'number', 'contacto',

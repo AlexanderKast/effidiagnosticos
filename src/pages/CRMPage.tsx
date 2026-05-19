@@ -11,6 +11,7 @@ import { fetchCRMRecords, fetchCommercialsForBooking, CommercialOption, CRMFilte
 import { fetchAllBookings } from '@/lib/bookingService';
 import { BookingConfig } from '@/lib/types';
 import { AppointmentCRM } from '@/lib/crmUtils';
+import { useDuplicates } from '@/hooks/useDuplicates';
 import { CRMPipeline, fetchPipelines } from '@/lib/crmPipelinesService';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -150,6 +151,14 @@ export default function CRMPage() {
     setSelectedAppt(null);
   };
 
+  const handleMerged = (winnerId: string, archivedIds: string[]) => {
+    setAppointments((prev) => prev.filter((a) => !archivedIds.includes(a.id)));
+    setSelectedAppt(null);
+    setSheetOpen(false);
+  };
+
+  const { duplicatesMap, getDuplicatesFor } = useDuplicates(appointments);
+
   const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
 
   if (authLoading || (!user && !authLoading)) return null;
@@ -244,6 +253,7 @@ export default function CRMPage() {
           <CRMTable
             appointments={appointments}
             commercials={commercials}
+            duplicatesMap={duplicatesMap}
             onRowClick={handleRowClick}
             onUpdated={handleUpdated}
           />
@@ -258,6 +268,8 @@ export default function CRMPage() {
         onArchived={handleArchived}
         commercials={commercials}
         canReassign={canReassign}
+        duplicates={selectedAppt ? getDuplicatesFor(selectedAppt) : []}
+        onMerged={handleMerged}
       />
 
       <CRMNewRecordDialog

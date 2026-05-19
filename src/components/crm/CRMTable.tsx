@@ -29,6 +29,7 @@ import {
   CRM_TIPOS_MARKETING,
   ESTADO_COLORS,
   CANAL_ICONS,
+  DuplicatesMap,
   extractPhone,
   formatDate,
   formatTime,
@@ -39,6 +40,7 @@ import { updateAppointmentCRM, CommercialOption } from '@/lib/crmService';
 interface CRMTableProps {
   appointments: AppointmentCRM[];
   commercials: CommercialOption[];
+  duplicatesMap?: DuplicatesMap;
   onRowClick: (appointment: AppointmentCRM) => void;
   onUpdated: (id: string, fields: Partial<AppointmentCRM>) => void;
 }
@@ -68,7 +70,7 @@ function StopCell({ children, className }: { children: React.ReactNode; classNam
   );
 }
 
-export function CRMTable({ appointments, commercials, onRowClick, onUpdated }: CRMTableProps) {
+export function CRMTable({ appointments, commercials, duplicatesMap = {}, onRowClick, onUpdated }: CRMTableProps) {
   if (appointments.length === 0) {
     return (
       <div className="text-center py-16 bg-muted/30 rounded-xl border border-dashed border-border">
@@ -121,6 +123,8 @@ export function CRMTable({ appointments, commercials, onRowClick, onUpdated }: C
         const estadoColor = appt.crm_estado_cliente
           ? ESTADO_COLORS[appt.crm_estado_cliente as CRMEstado] ?? ''
           : '';
+        const email = appt.lead_email?.trim().toLowerCase();
+        const isDuplicate = email ? (duplicatesMap[email]?.length ?? 0) > 1 : false;
 
         return (
           <div
@@ -132,7 +136,14 @@ export function CRMTable({ appointments, commercials, onRowClick, onUpdated }: C
             {/* Nombre + estado */}
             <div className="flex items-start justify-between gap-2 mb-2">
               <div className="min-w-0">
-                <p className="font-semibold text-foreground truncate">{appt.lead_name}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="font-semibold text-foreground truncate">{appt.lead_name}</p>
+                  {isDuplicate && (
+                    <span className="shrink-0 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+                      2x
+                    </span>
+                  )}
+                </div>
                 {phone && getWhatsAppLink(phone)
                   ? <a href={getWhatsAppLink(phone)!} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-sm text-green-600 hover:underline">{phone}</a>
                   : phone && <p className="text-sm text-muted-foreground">{phone}</p>
@@ -250,6 +261,8 @@ export function CRMTable({ appointments, commercials, onRowClick, onUpdated }: C
                 const estadoColor = appt.crm_estado_cliente
                   ? ESTADO_COLORS[appt.crm_estado_cliente as CRMEstado] ?? ''
                   : '';
+                const email = appt.lead_email?.trim().toLowerCase();
+                const isDuplicate = email ? (duplicatesMap[email]?.length ?? 0) > 1 : false;
 
                 return (
                   <TableRow
@@ -260,7 +273,14 @@ export function CRMTable({ appointments, commercials, onRowClick, onUpdated }: C
                   >
                     {/* Cliente — sticky, click abre sheet */}
                     <TableCell className="sticky left-0 bg-card z-10 text-sm pl-3" style={{ boxShadow: `inset 3px 0 0 ${color}` }}>
-                      <div className="font-medium whitespace-nowrap">{appt.lead_name}</div>
+                      <div className="flex items-center gap-1.5 font-medium whitespace-nowrap">
+                        {appt.lead_name}
+                        {isDuplicate && (
+                          <span className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+                            dup
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground">{appt.lead_email}</div>
                     </TableCell>
 

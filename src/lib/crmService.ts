@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { AppointmentCRM, CRMFields } from './crmUtils';
+import { AppointmentCRM, CRMFields, CRMEstado, CRM_ESTADOS, MergeLeadsParams, MergeLeadsResult } from './crmUtils';
 
 export interface CommercialOption {
   id: string;
@@ -134,6 +134,73 @@ export async function updateAppointmentLead(
   if (!data || data.length === 0) {
     throw new Error('No se actualizó el lead. Verifica permisos o recarga la página.');
   }
+}
+
+function getEstadoMasAvanzado(a: CRMEstado | null, b: CRMEstado | null): CRMEstado | null {
+  if (!a && !b) return null;
+  if (!a) return b;
+  if (!b) return a;
+  const iA = CRM_ESTADOS.indexOf(a);
+  const iB = CRM_ESTADOS.indexOf(b);
+  // Índices 0-6 son estados de avance; 7-8 (Descartado, NO Interesado) solo se toman si no hay otro
+  const advanceLimit = 7;
+  const aIsNegative = iA >= advanceLimit;
+  const bIsNegative = iB >= advanceLimit;
+  if (!aIsNegative && bIsNegative) return a;
+  if (aIsNegative && !bIsNegative) return b;
+  return iA >= iB ? a : b;
+}
+
+export async function mergeLeads(params: MergeLeadsParams, canReassign: boolean): Promise<MergeLeadsResult> {
+  const { winner, losers, assignCommercialId, assignCommercialName } = params;
+
+  // Fusionar observaciones
+  const allObs = [winner.crm_observaciones, ...losers.map((l) => l.crm_observaciones)]
+    .filter(Boolean)
+    .join('\n---\n');
+
+  // Estado más avanzado
+  let estado = winner.crm_estado_cliente;
+  for (const l of losers) estado = getEstadoMasAvanzado(estado, l.crm_estado_cliente);
+
+  // Monto y canal: tomar del primer loser que tenga valor si el winner está vacío
+  let monto = winner.crm_monto_venta;
+  let canal = winner.crm_canal_origen;
+  for (const l of losers) {
+    if (monto == null && l.crm_monto_venta != null) monto = l.crm_monto_venta;
+    if (!canal && l.crm_canal_origen) canal = l.crm_canal_origen;
+  }
+
+  const winnerFields: Partial<AppointmentCRM> & { assigned_commercial_id?: string | null; assigned_commercial_name?: string | null } = {
+    crm_observaciones: allObs || null,
+    crm_estado_cliente: estado,
+    crm_monto_venta: monto,
+    crm_canal_origen: canal,
+  };
+
+  if (assignCommercialId !== undefined) {
+    winnerFields.assigned_commercial_id = assignCommercialId;
+    winnerFields.assigned_commercial_name = assignCommercialName ?? null;
+  }
+
+  await updateAppointmentCRM(winner.id, winnerFields, canReassign);
+
+  const archivedIds: string[] = [];
+  for (const loser of losers) {
+    await archiveAppointment(loser.id, true);
+    archivedIds.push(loser.id);
+
+    // Si se reasigna comercial, actualizar también los losers antes de archivar
+    if (canReassign && assignCommercialId !== undefined) {
+      await updateAppointmentCRM(
+        loser.id,
+        { assigned_commercial_id: assignCommercialId, assigned_commercial_name: assignCommercialName ?? null },
+        true,
+      );
+    }
+  }
+
+  return { updatedWinner: winnerFields, archivedIds };
 }
 
 /** Obtiene la lista de comerciales asignables al pipeline de un booking */

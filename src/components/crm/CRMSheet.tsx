@@ -37,6 +37,7 @@ import {
   formatTime,
 } from '@/lib/crmUtils';
 import { updateAppointmentCRM, updateAppointmentLead, archiveAppointment, CommercialOption } from '@/lib/crmService';
+import { CRMDuplicatePanel } from './CRMDuplicatePanel';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -48,9 +49,11 @@ interface CRMSheetProps {
   onArchived: (id: string) => void;
   commercials: CommercialOption[];
   canReassign?: boolean;
+  duplicates?: AppointmentCRM[];
+  onMerged?: (winnerId: string, archivedIds: string[]) => void;
 }
 
-export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchived, commercials, canReassign = false }: CRMSheetProps) {
+export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchived, commercials, canReassign = false, duplicates = [], onMerged }: CRMSheetProps) {
   const [saving, setSaving] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [savingLead, setSavingLead] = useState(false);
@@ -371,6 +374,22 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchive
                     </div>
                   ))}
                 </div>
+                <Separator className="my-4" />
+              </>
+            )}
+
+            {duplicates.length > 0 && (
+              <>
+                <CRMDuplicatePanel
+                  current={appointment}
+                  duplicates={duplicates}
+                  commercials={commercials}
+                  canReassign={canReassign}
+                  onMerged={(winnerId, archivedIds) => {
+                    onMerged?.(winnerId, archivedIds);
+                    onOpenChange(false);
+                  }}
+                />
                 <Separator className="my-4" />
               </>
             )}
