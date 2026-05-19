@@ -197,6 +197,14 @@ async function updateRow(
 
 // ── Row builder ─────────────────────────────────────────────────────────────
 
+function findField(fd: Record<string, string>, ...keys: string[]): string {
+  for (const key of keys) {
+    const entry = Object.entries(fd).find(([k]) => k.toLowerCase() === key.toLowerCase());
+    if (entry) return entry[1];
+  }
+  return '';
+}
+
 function buildRow(
   appt: Record<string, any>,
   _bc: Record<string, any> | null,
@@ -212,7 +220,7 @@ function buildRow(
     '',
     assignedUser,
     appt.lead_name ?? '',
-    fd.whatsapp ?? fd.telefono ?? '',
+    findField(fd, 'whatsapp', 'telefono', 'teléfono', 'celular', 'phone', 'número de whatsapp', 'numero de whatsapp'),
     appt.crm_venta_realizada ? 'SI' : 'NO',
     appt.crm_canal_origen ?? '',
     appt.crm_tipo_cliente ?? '',
