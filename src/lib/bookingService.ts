@@ -175,11 +175,19 @@ export const deleteBookingConfig = async (bookingId: string): Promise<void> => {
 
 // Toggle booking status
 export const toggleBookingConfigStatus = async (bookingId: string): Promise<BookingConfig> => {
-  // First get current status
-  const current = await fetchBookingById(bookingId);
-  if (!current) throw new Error('Booking not found');
+  // Fetch current status regardless of active/paused state (admin view)
+  const { data, error } = await supabase
+    .from('booking_configs')
+    .select('active')
+    .eq('booking_id', bookingId)
+    .single();
 
-  return updateBookingConfig(bookingId, { active: !current.active });
+  if (error) {
+    console.error('Error fetching booking:', error);
+    throw error;
+  }
+
+  return updateBookingConfig(bookingId, { active: !data.active });
 };
 
 // Duplicate a booking with a new ID
