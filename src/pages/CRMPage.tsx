@@ -279,7 +279,7 @@ export default function CRMPage() {
         bookings={bookings}
         pipelines={pipelines}
         selectedPipelineId={selectedPipelineId}
-        bookingCountry="CO"
+        bookingCountry={bookings.find((b) => b.booking_id === selectedBookingId)?.country ?? 'CO'}
         commercials={commercials}
         canReassign={canReassign}
         selfCommercial={commercialProfile}

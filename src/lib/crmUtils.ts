@@ -107,6 +107,7 @@ export interface CRMFields {
 export interface AppointmentCRM extends CRMFields {
   id: string;
   booking_id: string | null;
+  booking_country: string | null;
   crm_pipeline_id: string | null;
   lead_name: string;
   lead_email: string;
@@ -190,7 +191,28 @@ export function formatTime(timeStr: string): string {
   return `${display}:${String(m).padStart(2, '0')} ${ampm}`;
 }
 
-export function formatCurrency(amount: number | null): string {
+// País (ISO 3166-1 alpha-2, igual al que usan booking_configs/user_roles) -> moneda local
+export const COUNTRY_CURRENCY: Record<string, { currency: string; locale: string }> = {
+  CO: { currency: 'COP', locale: 'es-CO' },
+  EC: { currency: 'USD', locale: 'es-EC' },
+  PA: { currency: 'USD', locale: 'es-PA' },
+  MX: { currency: 'MXN', locale: 'es-MX' },
+  PE: { currency: 'PEN', locale: 'es-PE' },
+  CL: { currency: 'CLP', locale: 'es-CL' },
+  AR: { currency: 'ARS', locale: 'es-AR' },
+  CR: { currency: 'CRC', locale: 'es-CR' },
+  US: { currency: 'USD', locale: 'en-US' },
+};
+
+const DEFAULT_CURRENCY = COUNTRY_CURRENCY.CO;
+
+export function getCurrencyForCountry(countryCode: string | null | undefined) {
+  if (!countryCode) return DEFAULT_CURRENCY;
+  return COUNTRY_CURRENCY[countryCode.toUpperCase()] ?? DEFAULT_CURRENCY;
+}
+
+export function formatCurrency(amount: number | null, countryCode?: string | null): string {
   if (amount === null || amount === undefined) return '';
-  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(amount);
+  const { currency, locale } = getCurrencyForCountry(countryCode);
+  return new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount);
 }

@@ -33,7 +33,7 @@ import {
   extractPhone,
   formatDate,
   formatTime,
-  formatCurrency,
+  getCurrencyForCountry,
 } from '@/lib/crmUtils';
 import { updateAppointmentCRM, CommercialOption } from '@/lib/crmService';
 
@@ -199,13 +199,18 @@ export function CRMTable({ appointments, commercials, duplicatesMap = {}, onRowC
               </Select>
 
               {/* Monto */}
-              <Input
-                type="number"
-                placeholder="Monto..."
-                className="h-7 text-xs"
-                defaultValue={appt.crm_monto_venta ?? ''}
-                onBlur={(e) => save(appt.id, { crm_monto_venta: e.target.value ? Number(e.target.value) : null })}
-              />
+              <div className="relative">
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">
+                  {getCurrencyForCountry(appt.booking_country).currency}
+                </span>
+                <Input
+                  type="number"
+                  placeholder="Monto..."
+                  className="h-7 text-xs pl-11"
+                  defaultValue={appt.crm_monto_venta ?? ''}
+                  onBlur={(e) => save(appt.id, { crm_monto_venta: e.target.value ? Number(e.target.value) : null })}
+                />
+              </div>
             </div>
 
             {/* Venta + observaciones */}
@@ -373,13 +378,18 @@ export function CRMTable({ appointments, commercials, duplicatesMap = {}, onRowC
 
                     {/* Monto — input inline */}
                     <StopCell>
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        className="h-7 text-xs min-w-[100px] border-transparent hover:border-border focus:border-border bg-transparent"
-                        defaultValue={appt.crm_monto_venta ?? ''}
-                        onBlur={(e) => save(appt.id, { crm_monto_venta: e.target.value ? Number(e.target.value) : null })}
-                      />
+                      <div className="relative">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">
+                          {getCurrencyForCountry(appt.booking_country).currency}
+                        </span>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          className="h-7 text-xs min-w-[100px] pl-11 border-transparent hover:border-border focus:border-border bg-transparent"
+                          defaultValue={appt.crm_monto_venta ?? ''}
+                          onBlur={(e) => save(appt.id, { crm_monto_venta: e.target.value ? Number(e.target.value) : null })}
+                        />
+                      </div>
                     </StopCell>
 
                     {/* Estado — select inline */}

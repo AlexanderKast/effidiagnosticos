@@ -25,7 +25,8 @@ export async function fetchCRMRecords(
       assigned_commercial_id, assigned_commercial_name, created_at, archived,
       gcal_event_id, gcal_html_link,
       crm_venta_realizada, crm_tipo_marketing, crm_tipo_cliente,
-      crm_monto_venta, crm_estado_cliente, crm_observaciones, crm_canal_origen
+      crm_monto_venta, crm_estado_cliente, crm_observaciones, crm_canal_origen,
+      booking_configs ( country )
     `)
     .eq('archived', filters.verArchivados ? true : false)
     .order('appointment_date', { ascending: false })
@@ -58,7 +59,12 @@ export async function fetchCRMRecords(
   const { data, error } = await query;
 
   if (error) throw error;
-  return (data ?? []) as AppointmentCRM[];
+
+  return (data ?? []).map((row: any) => {
+    const { booking_configs, ...rest } = row;
+    const bookingConfig = Array.isArray(booking_configs) ? booking_configs[0] : booking_configs;
+    return { ...rest, booking_country: bookingConfig?.country ?? null };
+  }) as AppointmentCRM[];
 }
 
 export async function updateAppointmentCRM(

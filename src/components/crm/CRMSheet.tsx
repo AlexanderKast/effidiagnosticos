@@ -35,6 +35,7 @@ import {
   extractPhone,
   formatDate,
   formatTime,
+  getCurrencyForCountry,
 } from '@/lib/crmUtils';
 import { updateAppointmentCRM, updateAppointmentLead, archiveAppointment, CommercialOption } from '@/lib/crmService';
 import { CRMDuplicatePanel } from './CRMDuplicatePanel';
@@ -443,7 +444,7 @@ export function CRMSheet({ appointment, open, onOpenChange, onUpdated, onArchive
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-sm">Monto de la venta (COP)</Label>
+                <Label className="text-sm">Monto de la venta ({getCurrencyForCountry(appointment.booking_country).currency})</Label>
                 <Input
                   type="number"
                   placeholder="0"

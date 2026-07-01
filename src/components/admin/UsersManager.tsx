@@ -96,7 +96,7 @@ export function UsersManager() {
     if (!inviteEmail.trim()) return;
     setInviteLoading(true);
     try {
-      const { error } = await supabase.functions.invoke('hyper-function', {
+      const { error } = await supabase.functions.invoke('invite-user', {
         body: {
           email: inviteEmail.trim(),
           role: inviteRole,
