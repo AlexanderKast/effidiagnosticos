@@ -42,10 +42,13 @@ const SECTION_LABELS: Record<Section, string> = {
 export default function AdminPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, isAdmin, isLoading: authLoading } = useAuth();
+  const { user, isAdmin, canReassign, isLoading: authLoading } = useAuth();
   const { openMobileSidebar } = useAdminLayout();
 
-  const activeSection = (searchParams.get('section') as Section) || 'bookings';
+  // Líderes no-admin solo pueden ver "Mi Equipo", sin importar el ?section= de la URL
+  const activeSection: Section = isAdmin
+    ? (searchParams.get('section') as Section) || 'bookings'
+    : 'equipo';
 
   const [bookings, setBookings] = useState<BookingConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -53,10 +56,10 @@ export default function AdminPage() {
   const [editingBooking, setEditingBooking] = useState<BookingConfig | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  // No-admins van al CRM directamente
+  // Sin rol de admin ni de lider: al CRM directamente
   useEffect(() => {
-    if (!authLoading && user && !isAdmin) navigate('/admin/crm');
-  }, [user, isAdmin, authLoading, navigate]);
+    if (!authLoading && user && !isAdmin && !canReassign) navigate('/admin/crm');
+  }, [user, isAdmin, canReassign, authLoading, navigate]);
 
   useEffect(() => {
     if (user && isAdmin) loadBookings();
